@@ -1,0 +1,55 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows (MSVC)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Configure
+        run: cmake --preset windows-msvc
+
+      - name: Build
+        run: cmake --build --preset windows-release
+
+      - name: Test
+        run: ctest --preset windows-release
+
+      - name: Type-check frontend
+        working-directory: web
+        run: npm run check
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdu-windows-x64
+          path: |
+            build/windows/Release/mdu.exe
+            build/windows/Release/web/
+            build/windows/Release/themes/
+            LICENSE
+          if-no-files-found: error
+
+  core:
+    name: Portable core (Linux, sanitizers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure
+        run: cmake --preset core-tests
+      - name: Build
+        run: cmake --build --preset core-tests --parallel
+      - name: Test
+        run: ctest --preset core-tests

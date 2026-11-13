@@ -1,0 +1,14 @@
+{
+  "name": "mdu-web",
+  "private": true,
+  "description": "MDU frontend (rendered in WebView2)",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

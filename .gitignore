@@ -1,0 +1,19 @@
+# Build output
+/build/
+/out/
+CMakeUserPresets.json
+
+# Frontend
+/web/node_modules/
+/web/dist/
+
+# Editors
+.vs/
+.vscode/
+*.user
+
+# User-supplied theme artwork (third-party; not redistributable under MIT)
+/themes/*/wallpaper/*.jpg
+/themes/*/wallpaper/*.jpeg
+/themes/*/wallpaper/*.png
+/themes/*/wallpaper/*.webp

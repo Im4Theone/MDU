@@ -1,0 +1,131 @@
+/* Neutral defaults. Themes override these custom properties. */
+:root {
+  --accent: #8a8f98;
+  --accent-strong: #b0b5bd;
+  --accent-muted: #5d6168;
+  --surface: rgba(20, 20, 24, 0.80);
+  --surface-hover: rgba(255, 255, 255, 0.10);
+  --surface-border: rgba(255, 255, 255, 0.12);
+  --text: #e8e8ea;
+  --text-muted: #9a9aa0;
+  --dock-radius: 18px;
+  --item-radius: 12px;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.40);
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --duration: 180ms;
+  --easing: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Geometry, set by the native side so it matches the window size exactly. */
+  --icon-size: 48px;
+  --padding: 9px;
+  --gap: 8px;
+  --shadow-inset: 8px;
+  --lift: 3px;
+}
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: var(--font);
+  color: var(--text);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.dock {
+  position: absolute;
+  inset: var(--shadow-inset);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap);
+  padding: var(--padding);
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--dock-radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  /* Hidden until the first state arrives so no unthemed frame is shown. */
+  opacity: 0;
+  transition: opacity var(--duration) var(--easing);
+}
+
+body.ready .dock { opacity: 1; }
+
+body[data-edge="left"] .dock,
+body[data-edge="right"] .dock {
+  flex-direction: column;
+}
+
+/* When items overflow, scroll along the dock instead of clipping them. */
+body.overflow .dock {
+  justify-content: flex-start;
+  overflow: auto;
+  scrollbar-width: none;
+}
+
+.item {
+  flex: none;
+  position: relative;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  padding: 0;
+  border: none;
+  border-radius: var(--item-radius);
+  background: transparent;
+  color: inherit;
+  cursor: default;
+  transition: transform var(--duration) var(--easing), background-color var(--duration) var(--easing);
+}
+
+.item:hover { background-color: var(--surface-hover); }
+body[data-edge="bottom"] .item:hover { transform: translateY(calc(-1 * var(--lift))); }
+body[data-edge="left"] .item:hover { transform: translateX(var(--lift)); }
+body[data-edge="right"] .item:hover { transform: translateX(calc(-1 * var(--lift))); }
+.item:active { transform: scale(0.94); }
+
+.item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.item img {
+  display: block;
+  width: 78%;
+  height: 78%;
+  margin: 11%;
+  pointer-events: none;
+}
+
+.item .fallback {
+  display: grid;
+  place-items: center;
+  width: 78%;
+  height: 78%;
+  margin: 11%;
+  border-radius: calc(var(--item-radius) - 2px);
+  background: var(--accent-muted);
+  color: var(--text);
+  font-size: calc(var(--icon-size) * 0.36);
+  font-weight: 600;
+}
+
+/* Brief launch feedback. */
+.item.launching { animation: launch 600ms var(--easing); }
+
+@keyframes launch {
+  0%, 100% { opacity: 1; }
+  40% { opacity: 0.45; }
+}
+
+/* Reduced motion: set by the script from the Windows animation setting or the
+   user's MDU preference. Feedback stays visible, movement goes away. */
+.reduce-motion .item,
+.reduce-motion .dock { transition: none; }
+.reduce-motion .item:hover,
+.reduce-motion .item:active { transform: none; }
+.reduce-motion .item.launching { animation: none; outline: 2px solid var(--accent); }

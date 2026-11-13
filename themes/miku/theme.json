@@ -1,0 +1,25 @@
+{
+  "name": "Miku",
+  "variables": {
+    "accent": "#86a83c",
+    "accent-strong": "#a3c650",
+    "accent-muted": "#5b7330",
+    "surface": "rgba(12, 12, 18, 0.80)",
+    "surface-hover": "rgba(134, 168, 60, 0.16)",
+    "surface-border": "rgba(134, 168, 60, 0.30)",
+    "text": "#e4e8dc",
+    "text-muted": "#98a08f",
+    "dock-radius": "18px",
+    "item-radius": "12px",
+    "shadow": "0 2px 8px rgba(0, 0, 0, 0.40)",
+    "font": "\"Segoe UI Variable Text\", \"Segoe UI\", system-ui, sans-serif",
+    "duration": "180ms",
+    "easing": "cubic-bezier(0.2, 0, 0, 1)"
+  },
+  "stylesheet": "theme.css",
+  "wallpaper": {
+    "image": "wallpaper/mobile.jpg",
+    "background": "#a8a8a8",
+    "feather": 0.04
+  }
+}

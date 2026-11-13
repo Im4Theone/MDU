@@ -1,0 +1,43 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 26, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "windows-msvc",
+      "displayName": "Windows (MSVC, x64)",
+      "description": "Uses the newest installed Visual Studio generator.",
+      "binaryDir": "${sourceDir}/build/windows",
+      "architecture": { "value": "x64", "strategy": "set" },
+      "cacheVariables": { "MDU_WARNINGS_AS_ERRORS": "ON" },
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "core-tests",
+      "displayName": "Portable core and tests (any OS, sanitizers on)",
+      "description": "Builds only the platform-independent core and its tests.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/core",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MDU_BUILD_APP": "OFF",
+        "MDU_WARNINGS_AS_ERRORS": "ON",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer"
+      },
+      "condition": { "type": "notEquals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "windows-release", "configurePreset": "windows-msvc", "configuration": "Release" },
+    { "name": "windows-debug", "configurePreset": "windows-msvc", "configuration": "Debug" },
+    { "name": "core-tests", "configurePreset": "core-tests" }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-msvc",
+      "configuration": "Release",
+      "output": { "outputOnFailure": true }
+    },
+    { "name": "core-tests", "configurePreset": "core-tests", "output": { "outputOnFailure": true } }
+  ]
+}

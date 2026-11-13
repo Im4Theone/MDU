@@ -1,0 +1,20 @@
+/* Miku theme additions. Colours live in theme.json; this file only adds the
+   few details that variables cannot express. */
+
+/* A thin olive rule along the outer edge of the bar, echoing the tie stripe. */
+.dock::after {
+  content: "";
+  position: absolute;
+  border-radius: 2px;
+  background: var(--accent-muted);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+body[data-edge="bottom"] .dock::after { left: 24%; right: 24%; bottom: 3px; height: 2px; }
+body[data-edge="left"] .dock::after   { top: 24%; bottom: 24%; left: 3px; width: 2px; }
+body[data-edge="right"] .dock::after  { top: 24%; bottom: 24%; right: 3px; width: 2px; }
+
+.item:focus-visible {
+  outline-color: var(--accent-strong);
+}
