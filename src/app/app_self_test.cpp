@@ -156,6 +156,20 @@ void App::selfTestStep()
         break;
     }
 
+    case SelfTestState::Stage::SettingsOpening:
+        // Malicious or misdirected messages first, then a real click on a control.
+        settings_->executeScript(LR"((() => {
+  const post = (m) => window.chrome.webview.postMessage(JSON.stringify(m));
+  post({ type: 'settings-update', settings: { wallpaper: { image: 'C:\\Windows\\evil.jpg' } } });
+  post({ type: 'settings-items', order: ['not-an-item'] });
+  post({ type: 'settings-rename', id: 'explorer', name: 'bad\nname' });
+  post({ type: 'launch', id: 'notepad' });
+  setTimeout(() => document.querySelector('input[name="edge"][value="left"]').click(), 300);
+})();)");
+        selfTest_->stage = SelfTestState::Stage::SettingsChanged;
+        SetTimer(window_, selfTestStepTimer, probeMs, nullptr);
+        break;
+
     case SelfTestState::Stage::SettingsChanged: {
         auto& checks = selfTest_->checks;
         selfTestCheckSettingsChange(DockEdge::Left, "settings_change_applied");
@@ -192,7 +206,6 @@ void App::selfTestStep()
         break;
 
     case SelfTestState::Stage::WaitingForDocks:
-    case SelfTestState::Stage::SettingsOpening:
     case SelfTestState::Stage::Done:
         break;
     }
@@ -246,18 +259,9 @@ void App::selfTestOnSettingsReady()
     log::info("self-test: settings page ready");
     selfTest_->checks.push_back({"settings_page_ready", true, "page loaded and announced itself"});
 
-    // Malicious or misdirected messages first, then a real click on a control.
-    settings_->executeScript(LR"((() => {
-  const post = (m) => window.chrome.webview.postMessage(JSON.stringify(m));
-  post({ type: 'settings-update', settings: { wallpaper: { image: 'C:\Windows\evil.jpg' } } });
-  post({ type: 'settings-items', order: ['not-an-item'] });
-  post({ type: 'settings-rename', id: 'explorer', name: 'bad
-name' });
-  post({ type: 'launch', id: 'notepad' });
-  setTimeout(() => document.querySelector('input[name="edge"][value="left"]').click(), 300);
-})();)");
-    selfTest_->stage = SelfTestState::Stage::SettingsChanged;
-    SetTimer(window_, selfTestStepTimer, probeMs, nullptr);
+    // Script injected while the page is still announcing itself can be lost,
+    // so the probes run from the next step.
+    SetTimer(window_, selfTestStepTimer, 1000, nullptr);
 }
 
 void App::selfTestCheckSettingsChange(DockEdge expected, const std::string& label)
