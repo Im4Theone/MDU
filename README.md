@@ -172,7 +172,7 @@ All versions are pinned and downloads are verified by SHA-256.
 | [Microsoft WebView2 SDK](https://www.nuget.org/packages/Microsoft.Web.WebView2) | 1.0.4314.35 | Renders the UI with the WebView2 runtime built into Windows 11. Linked statically, no extra DLL. |
 | [nlohmann/json](https://github.com/nlohmann/json) | 3.12.0 | JSON for settings, themes and UI messages. |
 | [TypeScript](https://www.typescriptlang.org/) | 7.0.2 | Build-time only, compiles the frontend. |
-| [Inno Setup](https://jrsoftware.org/isinfo.php) | 6.3 or newer | Build-time only, creates the installer. CI uses the copy preinstalled on the GitHub Windows runner and logs its version. |
+| [Inno Setup](https://jrsoftware.org/isinfo.php) | 6.7.1 in CI (6.3+ supported) | Build-time only, creates the installer. CI uses the copy preinstalled on the GitHub Windows runner and logs its version. Free for non-commercial use, which covers MDU; commercial redistribution would need an Inno Setup license. |
 
 Everything else is the Windows SDK: Win32, Shell, DWM, WIC and COM.
 
