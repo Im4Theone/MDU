@@ -4,7 +4,7 @@
 #include "ui/bridge.h"
 #include "windows/monitors.h"
 
-#include <WebView2.h>
+#include "ui/webview2_sdk.h"
 #include <windows.h>
 #include <wrl/client.h>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <WebView2.h>
+#include "ui/webview2_sdk.h"
 #include <wrl/client.h>
 
 #include <filesystem>
