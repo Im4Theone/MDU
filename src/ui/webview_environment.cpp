@@ -46,6 +46,15 @@ void WebViewEnvironment::finish(HRESULT result, ICoreWebView2Environment* enviro
     if (SUCCEEDED(result) && environment) {
         state_ = State::Ready;
         environment_ = environment;
+        LPWSTR version = nullptr;
+        if (SUCCEEDED(environment->get_BrowserVersionString(&version)) && version) {
+            std::string text;
+            for (const wchar_t* c = version; *c; ++c) {
+                text += static_cast<char>(*c < 128 ? *c : '?');
+            }
+            log::info("WebView2 runtime " + text);
+        }
+        CoTaskMemFree(version);
     } else {
         state_ = State::Failed;
         error_ = FAILED(result) ? result : E_FAIL;

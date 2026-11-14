@@ -291,8 +291,14 @@ void App::finishSelfTest(bool timedOut)
     KillTimer(window_, selfTestStepTimer);
 
     if (timedOut) {
-        selfTest_->checks.push_back({"completed_in_time", false,
-                                     std::format("timed out at stage {}", static_cast<int>(stageAtEnd))});
+        const auto ready = std::ranges::count_if(docks_, [](const auto& dock) { return dock->pageReady(); });
+        selfTest_->checks.push_back(
+            {"completed_in_time", false,
+             std::format("timed out at stage {}; {} of {} dock pages ready; WebView2 {}", static_cast<int>(stageAtEnd),
+                         ready, docks_.size(),
+                         webViewEnvironment_.failed()
+                             ? std::format("failed 0x{:08X}", static_cast<unsigned>(webViewEnvironment_.lastError()))
+                             : "not failed")});
     }
     // Never leave a test wallpaper behind.
     if (wallpaper_ && wallpaper_->hasRestoreState()) {

@@ -72,8 +72,9 @@ jobs:
             }
           } else {
             Write-Output 'No report was written.'
-            Get-Content (Join-Path $out 'mdu.log') -ErrorAction SilentlyContinue
           }
+          Write-Output '--- mdu.log ---'
+          Get-Content (Join-Path $out 'mdu.log') -ErrorAction SilentlyContinue
           exit $process.ExitCode
 
       - name: Upload self-test results

@@ -202,6 +202,7 @@ void DockWindow::attachWebView(ICoreWebView2Environment* environment)
 
 void DockWindow::onControllerCreated(ICoreWebView2Controller* controller)
 {
+    log::info("WebView2 controller created for " + toUtf8(monitor_.deviceName));
     controller_ = controller;
     if (FAILED(controller_->get_CoreWebView2(&webView_)) || !webView_) {
         log::error("WebView2 controller has no CoreWebView2");
@@ -259,6 +260,7 @@ void DockWindow::configureWebView()
     // fetched from the network.
     ComPtr<ICoreWebView2_3> webView3;
     if (SUCCEEDED(webView_.As(&webView3))) {
+        log::info("serving " + toUtf8(content_.webDirectory.wstring()) + " as " + toUtf8(appOrigin));
         webView3->SetVirtualHostNameToFolderMapping(L"mdu.example", content_.webDirectory.c_str(),
                                                     COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
         webView3->SetVirtualHostNameToFolderMapping(L"themes.mdu.example", content_.themesDirectory.c_str(),
@@ -306,6 +308,25 @@ void DockWindow::configureWebView()
         makeCallback<ICoreWebView2WebMessageReceivedEventHandler>(
             [this](ICoreWebView2*, ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
                 onWebMessage(args);
+                return S_OK;
+            })
+            .Get(),
+        &token);
+
+    webView_->add_NavigationCompleted(
+        makeCallback<ICoreWebView2NavigationCompletedEventHandler>(
+            [this](ICoreWebView2*, ICoreWebView2NavigationCompletedEventArgs* args) -> HRESULT {
+                BOOL success = FALSE;
+                COREWEBVIEW2_WEB_ERROR_STATUS status{};
+                args->get_IsSuccess(&success);
+                args->get_WebErrorStatus(&status);
+                const auto uri = toUtf8(currentUri());
+                if (success) {
+                    log::info("dock page loaded: " + uri);
+                } else {
+                    log::error(std::format("dock page failed to load: {} (web error status {})", uri,
+                                           static_cast<int>(status)));
+                }
                 return S_OK;
             })
             .Get(),
@@ -359,6 +380,7 @@ void DockWindow::onWebMessage(ICoreWebView2WebMessageReceivedEventArgs* args)
     }
 
     if (std::holds_alternative<bridge::ReadyMessage>(*message)) {
+        log::info("dock page ready on " + toUtf8(monitor_.deviceName));
         pageReady_ = true;
         flushState();
         updateVisibility();
