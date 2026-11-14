@@ -4,6 +4,7 @@ add_executable(mdu WIN32
     src/main.cpp
     src/app/app.cpp
     src/app/app_self_test.cpp
+    src/app/commands.cpp
     src/app/single_instance.cpp
     src/dock/app_bar.cpp
     src/dock/dock_window.cpp

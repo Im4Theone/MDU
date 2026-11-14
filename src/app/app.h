@@ -33,6 +33,7 @@ class App {
 public:
     static constexpr wchar_t messageWindowClass[] = L"MDU.MessageWindow";
     static constexpr UINT secondInstanceMessage = WM_APP + 10;
+    static constexpr UINT exitRequestMessage = WM_APP + 11;  // sent by `mdu.exe --exit` (installer)
 
     App(HINSTANCE instance, AppPaths paths, LaunchOptions options);
     ~App();

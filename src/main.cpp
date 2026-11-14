@@ -1,4 +1,5 @@
 #include "app/app.h"
+#include "app/commands.h"
 #include "app/single_instance.h"
 #include "settings/paths.h"
 #include "utilities/log.h"
@@ -7,11 +8,40 @@
 #include <shellapi.h>
 #include <windows.h>
 
+#include <chrono>
 #include <filesystem>
 #include <format>
 #include <string_view>
 
 namespace {
+
+// Installer commands; see app/commands.h.
+struct CommandRequest {
+    bool exitRunning = false;
+    bool uninstallCleanup = false;
+    int setStartup = -1;  // -1 = not requested, 0 = off, 1 = on
+    bool any() const { return exitRunning || uninstallCleanup || setStartup >= 0; }
+};
+
+CommandRequest parseCommands()
+{
+    CommandRequest request;
+    int count = 0;
+    LPWSTR* arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+    for (int i = 1; arguments && i < count; ++i) {
+        const std::wstring_view argument = arguments[i];
+        if (argument == L"--exit") {
+            request.exitRunning = true;
+        } else if (argument == L"--uninstall-cleanup") {
+            request.uninstallCleanup = true;
+        } else if (argument == L"--set-startup" && i + 1 < count) {
+            const std::wstring_view value = arguments[++i];
+            request.setStartup = value == L"on" ? 1 : value == L"off" ? 0 : -1;
+        }
+    }
+    LocalFree(arguments);
+    return request;
+}
 
 mdu::LaunchOptions parseCommandLine()
 {
@@ -89,6 +119,21 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
     HeapSetInformation(nullptr, HeapEnableTerminationOnCorruption, nullptr, 0);
 
     const auto options = parseCommandLine();
+
+    if (const auto command = parseCommands(); command.any()) {
+        const ComInitialization com;
+        const auto paths = mdu::resolveAppPaths(options.dataDirectory);
+        if (!paths) {
+            return 1;
+        }
+        if (command.uninstallCleanup) {
+            return mdu::commands::uninstallCleanup(*paths);
+        }
+        if (command.setStartup >= 0) {
+            return mdu::commands::setStartup(*paths, command.setStartup == 1);
+        }
+        return mdu::commands::stopRunningInstance(std::chrono::seconds(15)) ? 0 : 1;
+    }
 
     // A self-test runs isolated (own data folder) and may run next to a normal instance.
     mdu::SingleInstance instanceGuard(options.selfTestReport.empty()

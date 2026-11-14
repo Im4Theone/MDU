@@ -251,7 +251,18 @@ LRESULT App::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
             // even though the process may be terminated before run() returns.
             crashGuard_.onCleanExit();
             log::info("session ending");
+            // Restart Manager (used by installers) asks applications to close
+            // this way; leave once the message has been answered.
+            if (lParam & ENDSESSION_CLOSEAPP) {
+                PostMessageW(window_, exitRequestMessage, 0, 0);
+            }
         }
+        return 0;
+
+    case exitRequestMessage:
+        log::info("exit requested");
+        docks_.clear();
+        DestroyWindow(window_);
         return 0;
 
     case WM_DESTROY:

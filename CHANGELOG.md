@@ -15,6 +15,10 @@ First development version.
 - Theme system (`theme.json` + optional stylesheet) and the Miku theme.
 - Phone-to-desktop wallpaper adaptation with restore of the previous wallpaper.
 - Reduced-motion support.
+- Per-user installer (Inno Setup): no administrator rights, Start menu entry,
+  optional startup and desktop shortcut, clean uninstall that restores the
+  wallpaper and offers to keep settings. Installer commands `--exit`,
+  `--set-startup on|off` and `--uninstall-cleanup`.
 - Runtime self-test (`--self-test`, `--data-dir`), run on Windows in CI with
   screenshots. It found and fixed two startup bugs: the message window failed
   to create (MDU exited immediately), and docks could stay empty when WebView2

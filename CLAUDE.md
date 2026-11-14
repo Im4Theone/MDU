@@ -35,6 +35,9 @@ layer. C++23 + Win32 + WebView2 natively, TypeScript/HTML/CSS for the UI.
 - `cmake/App.cmake` defines the Windows target and copies `web/` and `themes/`
   next to the executable (the same layout the installer will use).
 - `tests/` uses a tiny in-house harness (`tests/test_main.h`), not a framework.
+- `installer/mdu.iss` is the per-user Inno Setup installer. It relies on the
+  `mdu.exe --exit`, `--set-startup` and `--uninstall-cleanup` commands
+  (`src/app/commands.cpp`); keep those in sync. CI installs and uninstalls it.
 
 ## Build and verify
 

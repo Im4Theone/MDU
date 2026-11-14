@@ -9,8 +9,20 @@ The first theme, **Miku**, follows a Miku / Monster Energy phone theme: dark
 surfaces, muted olive accents and a grey backdrop.
 
 > Status: early development (0.1.0). The dock, tray menu, startup registration,
-> crash recovery and wallpaper adaptation are implemented. A settings window and
-> an installer are not built yet; settings are edited in a JSON file.
+> crash recovery, wallpaper adaptation and the installer are implemented. A
+> settings window is not built yet; settings are edited in a JSON file.
+
+## Installing
+
+Run `MDU-Setup-<version>.exe`. It installs for your user only, with no
+administrator prompt, into `%LOCALAPPDATA%\Programs\MDU`, and adds a Start menu
+entry. It offers to start MDU when you sign in (on by default) and to create a
+desktop shortcut.
+
+Uninstall from **Settings → Apps**. The uninstaller stops MDU, puts your
+previous wallpaper back if MDU replaced it, removes the startup entry, and
+deletes caches, logs and browser data. It asks whether to delete your settings
+too; a silent uninstall (`/VERYSILENT`) keeps them.
 
 ## Features
 
@@ -137,6 +149,20 @@ changes the startup registration and always restores the previous wallpaper.
 CI runs it on every push; the results are uploaded as the `mdu-self-test`
 artifact, so you can see what MDU looks like on Windows without a test machine.
 
+### Building the installer
+
+Requires [Inno Setup](https://jrsoftware.org/isinfo.php) 6.3 or newer.
+
+```powershell
+cmake --install build\windows --config Release --prefix staging
+iscc /DSourceDir=$PWD\staging /DAppVersion=0.1.0 installer\mdu.iss
+```
+
+CI builds the installer on every push, installs it silently on the runner,
+checks the installed files, shortcut and startup entry, runs the self-test from
+the installed copy, uninstalls, and checks that everything except the settings
+file is gone. The installer is uploaded as the `mdu-setup` artifact.
+
 ### Dependencies
 
 All versions are pinned and downloads are verified by SHA-256.
@@ -146,6 +172,7 @@ All versions are pinned and downloads are verified by SHA-256.
 | [Microsoft WebView2 SDK](https://www.nuget.org/packages/Microsoft.Web.WebView2) | 1.0.4314.35 | Renders the UI with the WebView2 runtime built into Windows 11. Linked statically, no extra DLL. |
 | [nlohmann/json](https://github.com/nlohmann/json) | 3.12.0 | JSON for settings, themes and UI messages. |
 | [TypeScript](https://www.typescriptlang.org/) | 7.0.2 | Build-time only, compiles the frontend. |
+| [Inno Setup](https://jrsoftware.org/isinfo.php) | 6.3 or newer | Build-time only, creates the installer. CI uses the copy preinstalled on the GitHub Windows runner and logs its version. |
 
 Everything else is the Windows SDK: Win32, Shell, DWM, WIC and COM.
 
@@ -164,6 +191,7 @@ src/
 web/                 dock frontend (HTML, CSS, TypeScript)
 themes/miku/         the Miku theme
 tests/               unit tests for the portable core
+installer/           Inno Setup script
 ```
 
 ## Contributing

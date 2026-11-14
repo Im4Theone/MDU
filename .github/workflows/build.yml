@@ -100,6 +100,80 @@ jobs:
             LICENSE
           if-no-files-found: error
 
+      - name: Build installer
+        shell: pwsh
+        run: |
+          cmake --install build/windows --config Release --prefix staging
+          $version = (Select-String -Path CMakeLists.txt -Pattern 'VERSION (\d+\.\d+\.\d+)').Matches[0].Groups[1].Value
+          $candidates = @(
+            (Get-Command iscc.exe -ErrorAction SilentlyContinue).Source,
+            "${env:ProgramFiles(x86)}\Inno Setup 7\ISCC.exe",
+            "${env:ProgramFiles}\Inno Setup 7\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+          ) | Where-Object { $_ -and (Test-Path $_) }
+          if (-not $candidates) { throw 'Inno Setup (ISCC.exe) is not installed on this runner' }
+          $iscc = $candidates[0]
+          Write-Output ("Using {0} ({1})" -f $iscc, (Get-Item $iscc).VersionInfo.ProductVersion)
+          & $iscc "/DSourceDir=$PWD\staging" "/DAppVersion=$version" "/O$PWD\installer-out" installer\mdu.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+
+      # Installs for the current user, verifies the result, runs the self-test
+      # from the installed copy, then uninstalls and verifies the cleanup.
+      - name: Installer test
+        shell: pwsh
+        run: |
+          function Check([bool]$condition, [string]$message) {
+            if ($condition) { Write-Output "PASS  $message" } else { Write-Output "FAIL  $message"; $script:failed = $true }
+          }
+          $failed = $false
+          $setup = (Get-ChildItem installer-out\MDU-Setup-*.exe)[0].FullName
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\MDU'
+          $data = Join-Path $env:LOCALAPPDATA 'MDU'
+          $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+
+          $install = Start-Process $setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/TASKS=startup' -PassThru -Wait
+          Check ($install.ExitCode -eq 0) "installer exit code $($install.ExitCode)"
+          foreach ($file in 'mdu.exe', 'unins000.exe', 'LICENSE', 'web\index.html', 'web\scripts\dock.js', 'web\styles\dock.css', 'themes\miku\theme.json') {
+            Check (Test-Path (Join-Path $app $file)) "installed $file"
+          }
+          Check (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\MDU.lnk") 'Start menu shortcut'
+          $run = (Get-ItemProperty $runKey -Name MDU -ErrorAction SilentlyContinue).MDU
+          Check ($run -like "*$app\mdu.exe*") "startup entry: $run"
+          $config = Get-Content (Join-Path $data 'config.json') -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
+          Check ($config.startWithWindows -eq $true) 'settings file records start with Windows'
+
+          $testDir = Join-Path $env:RUNNER_TEMP 'mdu-installed-test'
+          New-Item -ItemType Directory -Force $testDir | Out-Null
+          $selfTest = Start-Process (Join-Path $app 'mdu.exe') -PassThru `
+            -ArgumentList @('--self-test', "`"$testDir\report.json`"", '--data-dir', "`"$testDir\data`"")
+          if (-not $selfTest.WaitForExit(120000)) { $selfTest.Kill() }
+          Check ($selfTest.ExitCode -eq 0) "self-test of the installed copy (exit code $($selfTest.ExitCode))"
+
+          Start-Process (Join-Path $app 'mdu.exe') | Out-Null
+          Start-Sleep -Seconds 5
+          Check ($null -ne (Get-Process mdu -ErrorAction SilentlyContinue)) 'MDU running before uninstall'
+
+          Start-Process (Join-Path $app 'unins000.exe') -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' | Out-Null
+          # The uninstaller hands over to a temporary copy, so wait for the result.
+          for ($i = 0; $i -lt 60 -and (Test-Path $app); $i++) { Start-Sleep -Seconds 1 }
+          Check (-not (Test-Path $app)) 'install folder removed'
+          Check ($null -eq (Get-Process mdu -ErrorAction SilentlyContinue)) 'MDU stopped by the uninstaller'
+          Check ($null -eq (Get-ItemProperty $runKey -Name MDU -ErrorAction SilentlyContinue)) 'startup entry removed'
+          Check (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\MDU.lnk")) 'Start menu shortcut removed'
+          foreach ($folder in 'cache', 'logs', 'state', 'WebView2') {
+            Check (-not (Test-Path (Join-Path $data $folder))) "data\$folder removed"
+          }
+          Check (Test-Path (Join-Path $data 'config.json')) 'settings kept after a silent uninstall'
+          if ($failed) { exit 1 }
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdu-setup
+          path: installer-out/MDU-Setup-*.exe
+          if-no-files-found: error
+
   core:
     name: Portable core (Linux, sanitizers)
     runs-on: ubuntu-latest

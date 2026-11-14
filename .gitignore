@@ -17,3 +17,5 @@ CMakeUserPresets.json
 /themes/*/wallpaper/*.jpeg
 /themes/*/wallpaper/*.png
 /themes/*/wallpaper/*.webp
+/staging/
+/installer-out/
