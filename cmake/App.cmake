@@ -31,8 +31,6 @@ mdu_set_warnings(mdu)
 if(MSVC)
     # The manifest is embedded through the resource script.
     target_link_options(mdu PRIVATE /MANIFEST:NO)
-    # Static CRT: no Visual C++ redistributable needed on the target machine.
-    set_property(TARGET mdu PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
 # Compile the TypeScript frontend and lay out web/ and themes/ next to mdu.exe,

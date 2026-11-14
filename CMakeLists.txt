@@ -10,6 +10,10 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Static MSVC runtime for every target, so mdu.exe needs no Visual C++
+# redistributable. It must be project-wide: mixing runtimes fails to link.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 # The application itself only builds on Windows. The platform-independent core
 # (configuration, layout, theme parsing, message validation, wallpaper
 # adaptation) also builds elsewhere so its tests can run anywhere.
