@@ -477,7 +477,7 @@ void App::layoutDock(DockWindow& dock)
         if (!theme_->stylesheet.empty()) {
             auto relative = theme_->stylesheet;
             std::ranges::replace(relative, '\\', '/');
-            state.themeStylesheet = toUtf8(DockWindow::themesOrigin) + theme_->id + "/" + relative;
+            state.themeStylesheet = toUtf8(WebViewHost::themesOrigin) + theme_->id + "/" + relative;
         }
     }
     for (const auto& item : config_.pinned) {

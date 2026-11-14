@@ -4,9 +4,9 @@
 #include "ui/bridge.h"
 #include "windows/monitors.h"
 
-#include "ui/webview2_sdk.h"
+#include "ui/webview_host.h"
+
 #include <windows.h>
-#include <wrl/client.h>
 
 #include <filesystem>
 #include <functional>
@@ -26,10 +26,7 @@ public:
         std::function<void(COREWEBVIEW2_PROCESS_FAILED_KIND)> processFailed;
     };
 
-    struct Content {
-        std::filesystem::path webDirectory;
-        std::filesystem::path themesDirectory;
-    };
+    using Content = WebViewHost::Content;
 
     static std::unique_ptr<DockWindow> create(HINSTANCE instance, const MonitorInfo& monitor, Callbacks callbacks,
                                               Content content);
@@ -52,12 +49,9 @@ public:
     HWND window() const { return window_; }
     bool pageReady() const { return pageReady_; }
     int rejectedMessages() const { return rejectedMessages_; }
-    int blockedNavigations() const { return blockedNavigations_; }
-    std::wstring currentUri() const;
+    int blockedNavigations() const { return webView_ ? webView_->blockedNavigations() : 0; }
+    std::wstring currentUri() const { return webView_ ? webView_->currentUri() : std::wstring(); }
     void executeScript(const std::wstring& script);
-
-    static constexpr wchar_t appOrigin[] = L"https://mdu.example/";
-    static constexpr wchar_t themesOrigin[] = L"https://themes.mdu.example/";
 
 private:
     DockWindow(const MonitorInfo& monitor, Callbacks callbacks, Content content);
@@ -65,12 +59,9 @@ private:
     static LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
     LRESULT handleMessage(UINT message, WPARAM wParam, LPARAM lParam);
 
-    void onControllerCreated(ICoreWebView2Controller* controller);
-    void configureWebView();
-    void onWebMessage(ICoreWebView2WebMessageReceivedEventArgs* args);
+    void onPageMessage(const std::string& text);
     void flushState();
     void updateVisibility();
-    void resizeWebView();
     bool fullscreenAppOnMonitor() const;
 
     HWND window_ = nullptr;
@@ -79,18 +70,13 @@ private:
     Content content_;
     std::unique_ptr<AppBar> appBar_;
 
-    Microsoft::WRL::ComPtr<ICoreWebView2Controller> controller_;
-    Microsoft::WRL::ComPtr<ICoreWebView2> webView_;
+    std::unique_ptr<WebViewHost> webView_;
     std::string state_;
 
     bool pageReady_ = false;
     bool hasBounds_ = false;
     bool fullscreenHidden_ = false;
     int rejectedMessages_ = 0;
-    int blockedNavigations_ = 0;
-
-    // Async WebView2 callbacks hold a weak reference so they never touch a destroyed window.
-    std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
 };
 
 }  // namespace mdu

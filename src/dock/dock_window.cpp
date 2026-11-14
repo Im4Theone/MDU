@@ -1,6 +1,5 @@
 #include "dock/dock_window.h"
 
-#include "utilities/com_callback.h"
 #include "utilities/log.h"
 #include "utilities/strings.h"
 
@@ -18,31 +17,6 @@ namespace {
 
 constexpr wchar_t windowClassName[] = L"MDU.Dock";
 constexpr UINT appBarMessage = WM_APP + 1;
-
-// Owns a string allocated by WebView2 with CoTaskMemAlloc.
-class CoTaskString {
-public:
-    CoTaskString() = default;
-    ~CoTaskString() { CoTaskMemFree(value_); }
-    CoTaskString(const CoTaskString&) = delete;
-    CoTaskString& operator=(const CoTaskString&) = delete;
-
-    LPWSTR* put() { return &value_; }
-    const wchar_t* get() const { return value_ ? value_ : L""; }
-
-private:
-    LPWSTR value_ = nullptr;
-};
-
-bool startsWith(const wchar_t* text, const wchar_t* prefix)
-{
-    return std::wcsncmp(text, prefix, std::wcslen(prefix)) == 0;
-}
-
-bool isTrustedUri(const wchar_t* uri)
-{
-    return startsWith(uri, DockWindow::appOrigin);
-}
 
 void registerWindowClass(HINSTANCE instance, WNDPROC procedure)
 {
@@ -86,6 +60,29 @@ std::unique_ptr<DockWindow> DockWindow::create(HINSTANCE instance, const Monitor
 
     dock->appBar_ = std::make_unique<AppBar>(window, appBarMessage);
     dock->appBar_->registerBar();
+
+    DockWindow* self = dock.get();
+    dock->webView_ = std::make_unique<WebViewHost>(
+        window, dock->content_,
+        WebViewHost::Options{.page = L"index.html",
+                             .name = "dock " + toUtf8(monitor.deviceName),
+                             .transparent = true,
+                             .startVisible = false},
+        WebViewHost::Callbacks{
+            .message = [self](const std::string& text) { self->onPageMessage(text); },
+            .pageLost =
+                [self] {
+                    // The page reloads and sends "ready" again, which re-sends the state.
+                    self->pageReady_ = false;
+                    self->updateVisibility();
+                },
+            .browserFailed =
+                [self](COREWEBVIEW2_PROCESS_FAILED_KIND kind) {
+                    if (self->callbacks_.processFailed) {
+                        self->callbacks_.processFailed(kind);
+                    }
+                },
+        });
     return dock;
 }
 
@@ -96,12 +93,7 @@ DockWindow::DockWindow(const MonitorInfo& monitor, Callbacks callbacks, Content 
 
 DockWindow::~DockWindow()
 {
-    alive_.reset();
-    if (controller_) {
-        controller_->Close();
-    }
-    webView_.Reset();
-    controller_.Reset();
+    webView_.reset();
     appBar_.reset();  // removes the app bar while the window still exists
     if (window_) {
         SetWindowLongPtrW(window_, GWLP_USERDATA, 0);
@@ -143,15 +135,17 @@ LRESULT DockWindow::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
         return 0;
 
     case WM_SIZE:
-        resizeWebView();
+        if (webView_) {
+            webView_->resizeToParent();
+        }
         return 0;
 
     case WM_WINDOWPOSCHANGED:
         if (appBar_) {
             appBar_->onWindowPositionChanged();
         }
-        if (controller_) {
-            controller_->NotifyParentWindowPositionChanged();
+        if (webView_) {
+            webView_->parentMoved();
         }
         break;  // DefWindowProc generates WM_SIZE / WM_MOVE
 
@@ -172,209 +166,14 @@ LRESULT DockWindow::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
 
 void DockWindow::attachWebView(ICoreWebView2Environment* environment)
 {
-    if (!environment || controller_) {
-        return;
-    }
-
-    std::weak_ptr<bool> alive = alive_;
-    const HRESULT hr = environment->CreateCoreWebView2Controller(
-        window_, makeCallback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
-                     [this, alive](HRESULT result, ICoreWebView2Controller* controller) -> HRESULT {
-                         if (alive.expired()) {
-                             if (controller) {
-                                 controller->Close();
-                             }
-                             return S_OK;
-                         }
-                         if (FAILED(result) || !controller) {
-                             log::error(std::format("cannot create WebView2 controller: 0x{:08X}",
-                                                    static_cast<unsigned>(result)));
-                             return S_OK;
-                         }
-                         onControllerCreated(controller);
-                         return S_OK;
-                     })
-                     .Get());
-    if (FAILED(hr)) {
-        log::error(std::format("CreateCoreWebView2Controller failed: 0x{:08X}", static_cast<unsigned>(hr)));
+    if (webView_) {
+        webView_->attach(environment);
     }
 }
 
-void DockWindow::onControllerCreated(ICoreWebView2Controller* controller)
+void DockWindow::onPageMessage(const std::string& text)
 {
-    log::info("WebView2 controller created for " + toUtf8(monitor_.deviceName));
-    controller_ = controller;
-    if (FAILED(controller_->get_CoreWebView2(&webView_)) || !webView_) {
-        log::error("WebView2 controller has no CoreWebView2");
-        controller_->Close();
-        controller_.Reset();
-        return;
-    }
-
-    ComPtr<ICoreWebView2Controller2> controller2;
-    if (SUCCEEDED(controller_.As(&controller2))) {
-        controller2->put_DefaultBackgroundColor(COREWEBVIEW2_COLOR{0, 0, 0, 0});
-    }
-
-    configureWebView();
-    resizeWebView();
-    controller_->put_IsVisible(FALSE);
-
-    std::wstring url = appOrigin;
-    url += L"index.html";
-    webView_->Navigate(url.c_str());
-}
-
-void DockWindow::configureWebView()
-{
-    ComPtr<ICoreWebView2Settings> settings;
-    if (SUCCEEDED(webView_->get_Settings(&settings))) {
-#ifdef NDEBUG
-        settings->put_AreDevToolsEnabled(FALSE);
-#endif
-        settings->put_AreDefaultContextMenusEnabled(FALSE);
-        settings->put_AreDefaultScriptDialogsEnabled(FALSE);
-        settings->put_IsStatusBarEnabled(FALSE);
-        settings->put_IsZoomControlEnabled(FALSE);
-
-        ComPtr<ICoreWebView2Settings3> settings3;
-        if (SUCCEEDED(settings.As(&settings3))) {
-            settings3->put_AreBrowserAcceleratorKeysEnabled(FALSE);  // no reload, print, find, ...
-        }
-        ComPtr<ICoreWebView2Settings4> settings4;
-        if (SUCCEEDED(settings.As(&settings4))) {
-            settings4->put_IsPasswordAutosaveEnabled(FALSE);
-            settings4->put_IsGeneralAutofillEnabled(FALSE);
-        }
-        ComPtr<ICoreWebView2Settings5> settings5;
-        if (SUCCEEDED(settings.As(&settings5))) {
-            settings5->put_IsPinchZoomEnabled(FALSE);
-        }
-        ComPtr<ICoreWebView2Settings6> settings6;
-        if (SUCCEEDED(settings.As(&settings6))) {
-            settings6->put_IsSwipeNavigationEnabled(FALSE);
-        }
-    }
-
-    // Serve the bundled frontend and themes from local folders. Nothing is
-    // fetched from the network.
-    ComPtr<ICoreWebView2_3> webView3;
-    if (SUCCEEDED(webView_.As(&webView3))) {
-        log::info("serving " + toUtf8(content_.webDirectory.wstring()) + " as " + toUtf8(appOrigin));
-        webView3->SetVirtualHostNameToFolderMapping(L"mdu.example", content_.webDirectory.c_str(),
-                                                    COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
-        webView3->SetVirtualHostNameToFolderMapping(L"themes.mdu.example", content_.themesDirectory.c_str(),
-                                                    COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
-    } else {
-        log::error("WebView2 runtime is too old for virtual host mapping");
-    }
-
-    EventRegistrationToken token{};
-    const auto blockUntrustedNavigation = [this](ICoreWebView2*,
-                                                 ICoreWebView2NavigationStartingEventArgs* args) -> HRESULT {
-        CoTaskString uri;
-        args->get_Uri(uri.put());
-        if (!isTrustedUri(uri.get())) {
-            log::warning("blocked navigation to " + toUtf8(uri.get()));
-            args->put_Cancel(TRUE);
-            ++blockedNavigations_;
-        }
-        return S_OK;
-    };
-    webView_->add_NavigationStarting(
-        makeCallback<ICoreWebView2NavigationStartingEventHandler>(blockUntrustedNavigation).Get(), &token);
-    webView_->add_FrameNavigationStarting(
-        makeCallback<ICoreWebView2NavigationStartingEventHandler>(blockUntrustedNavigation).Get(), &token);
-
-    webView_->add_NewWindowRequested(
-        makeCallback<ICoreWebView2NewWindowRequestedEventHandler>(
-            [](ICoreWebView2*, ICoreWebView2NewWindowRequestedEventArgs* args) -> HRESULT {
-                args->put_Handled(TRUE);  // never open popups
-                return S_OK;
-            })
-            .Get(),
-        &token);
-
-    webView_->add_PermissionRequested(
-        makeCallback<ICoreWebView2PermissionRequestedEventHandler>(
-            [](ICoreWebView2*, ICoreWebView2PermissionRequestedEventArgs* args) -> HRESULT {
-                args->put_State(COREWEBVIEW2_PERMISSION_STATE_DENY);
-                return S_OK;
-            })
-            .Get(),
-        &token);
-
-    webView_->add_WebMessageReceived(
-        makeCallback<ICoreWebView2WebMessageReceivedEventHandler>(
-            [this](ICoreWebView2*, ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
-                onWebMessage(args);
-                return S_OK;
-            })
-            .Get(),
-        &token);
-
-    webView_->add_NavigationCompleted(
-        makeCallback<ICoreWebView2NavigationCompletedEventHandler>(
-            [this](ICoreWebView2*, ICoreWebView2NavigationCompletedEventArgs* args) -> HRESULT {
-                BOOL success = FALSE;
-                COREWEBVIEW2_WEB_ERROR_STATUS status{};
-                args->get_IsSuccess(&success);
-                args->get_WebErrorStatus(&status);
-                const auto uri = toUtf8(currentUri());
-                if (success) {
-                    log::info("dock page loaded: " + uri);
-                } else if (status == COREWEBVIEW2_WEB_ERROR_STATUS_OPERATION_CANCELED) {
-                    log::info("a navigation was cancelled; the dock page stays at " + uri);
-                } else {
-                    log::error(std::format("dock page failed to load: {} (web error status {})", uri,
-                                           static_cast<int>(status)));
-                }
-                return S_OK;
-            })
-            .Get(),
-        &token);
-
-    std::weak_ptr<bool> alive = alive_;
-    webView_->add_ProcessFailed(
-        makeCallback<ICoreWebView2ProcessFailedEventHandler>(
-            [this, alive](ICoreWebView2*, ICoreWebView2ProcessFailedEventArgs* args) -> HRESULT {
-                if (alive.expired()) {
-                    return S_OK;
-                }
-                COREWEBVIEW2_PROCESS_FAILED_KIND kind{};
-                args->get_ProcessFailedKind(&kind);
-                log::error(std::format("WebView2 process failed (kind {})", static_cast<int>(kind)));
-                if (kind == COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED ||
-                    kind == COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE) {
-                    // The page reloads and sends "ready" again, which re-sends the state.
-                    pageReady_ = false;
-                    updateVisibility();
-                    webView_->Reload();
-                    return S_OK;
-                }
-                if (callbacks_.processFailed) {
-                    callbacks_.processFailed(kind);
-                }
-                return S_OK;
-            })
-            .Get(),
-        &token);
-}
-
-void DockWindow::onWebMessage(ICoreWebView2WebMessageReceivedEventArgs* args)
-{
-    CoTaskString source;
-    args->get_Source(source.put());
-    if (!isTrustedUri(source.get())) {
-        return;
-    }
-
-    CoTaskString text;
-    if (FAILED(args->TryGetWebMessageAsString(text.put()))) {
-        return;  // only JSON strings are part of the protocol
-    }
-
-    const auto message = bridge::parseIncoming(toUtf8(text.get()));
+    const auto message = bridge::parseIncoming(text);
     if (!message) {
         log::warning("ignored invalid message from the dock page");
         ++rejectedMessages_;
@@ -392,20 +191,10 @@ void DockWindow::onWebMessage(ICoreWebView2WebMessageReceivedEventArgs* args)
     }
 }
 
-std::wstring DockWindow::currentUri() const
-{
-    if (!webView_) {
-        return {};
-    }
-    CoTaskString uri;
-    webView_->get_Source(uri.put());
-    return uri.get();
-}
-
 void DockWindow::executeScript(const std::wstring& script)
 {
     if (webView_) {
-        webView_->ExecuteScript(script.c_str(), nullptr);
+        webView_->executeScript(script);
     }
 }
 
@@ -418,7 +207,7 @@ void DockWindow::postState(std::string json)
 void DockWindow::flushState()
 {
     if (pageReady_ && webView_ && !state_.empty()) {
-        webView_->PostWebMessageAsJson(toWide(state_).c_str());
+        webView_->postJson(state_);
     }
 }
 
@@ -429,22 +218,13 @@ void DockWindow::setBounds(const Rect& bounds)
     updateVisibility();
 }
 
-void DockWindow::resizeWebView()
-{
-    if (controller_) {
-        RECT client{};
-        GetClientRect(window_, &client);
-        controller_->put_Bounds(client);
-    }
-}
-
 void DockWindow::updateVisibility()
 {
     const bool visible = pageReady_ && hasBounds_ && !fullscreenHidden_;
-    if (controller_) {
-        // A hidden WebView2 stops rendering, so a dock behind a full-screen
-        // game costs nothing.
-        controller_->put_IsVisible(visible ? TRUE : FALSE);
+    // A hidden WebView2 stops rendering, so a dock behind a full-screen game
+    // costs nothing.
+    if (webView_) {
+        webView_->setVisible(visible);
     }
     if (visible) {
         SetWindowPos(window_, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);

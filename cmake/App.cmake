@@ -10,6 +10,7 @@ add_executable(mdu WIN32
     src/dock/dock_window.cpp
     src/settings/paths.cpp
     src/ui/webview_environment.cpp
+    src/ui/webview_host.cpp
     src/utilities/strings.cpp
     src/wallpaper/wallpaper.cpp
     src/windows/app_launcher.cpp

@@ -141,7 +141,7 @@ void App::selfTestStep()
                                       selfTest_->launchedIds.size())});
         const auto uri = dock.currentUri();
         checks.push_back({"navigation_blocked",
-                          dock.blockedNavigations() >= 1 && uri.starts_with(DockWindow::appOrigin),
+                          dock.blockedNavigations() >= 1 && uri.starts_with(WebViewHost::appOrigin),
                           std::format("{} blocked; page is {}", dock.blockedNavigations(), toUtf8(uri))});
 
         selfTestCheckWallpaper();
