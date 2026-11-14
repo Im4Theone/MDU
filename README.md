@@ -123,6 +123,20 @@ ctest --preset core-tests
 Every push is built and tested by GitHub Actions; the Windows job uploads a
 ready-to-run build as the `mdu-windows-x64` artifact.
 
+### Runtime self-test
+
+`mdu.exe --self-test <report.json> [--data-dir <folder>]` starts the real
+application in an isolated data folder, then checks it from the outside:
+docks are created, visible, drawn and transparent, reserve their screen space,
+launch an item when it is clicked in the UI, reject malformed and malicious
+messages, refuse to navigate away from local content, and apply and restore the
+wallpaper. It writes a JSON report, screenshots (`screen.png`, `dock-N.png`)
+and exits with 0 (all passed), 3 (a check failed) or 2 (timed out). It never
+changes the startup registration and always restores the previous wallpaper.
+
+CI runs it on every push; the results are uploaded as the `mdu-self-test`
+artifact, so you can see what MDU looks like on Windows without a test machine.
+
 ### Dependencies
 
 All versions are pinned and downloads are verified by SHA-256.

@@ -3,6 +3,7 @@
 add_executable(mdu WIN32
     src/main.cpp
     src/app/app.cpp
+    src/app/app_self_test.cpp
     src/app/single_instance.cpp
     src/dock/app_bar.cpp
     src/dock/dock_window.cpp
@@ -12,14 +13,16 @@ add_executable(mdu WIN32
     src/wallpaper/wallpaper.cpp
     src/windows/app_launcher.cpp
     src/windows/icon_extractor.cpp
+    src/windows/image_io.cpp
     src/windows/monitors.cpp
+    src/windows/screen_capture.cpp
     src/windows/startup.cpp
     src/windows/tray_icon.cpp
     resources/mdu.rc
 )
 target_link_libraries(mdu PRIVATE
     mdu_core webview2
-    comctl32 dwmapi shcore shlwapi shell32 ole32 windowscodecs advapi32 user32 version)
+    comctl32 dwmapi gdi32 shcore shlwapi shell32 ole32 windowscodecs advapi32 user32 version)
 target_compile_definitions(mdu PRIVATE
     MDU_VERSION="${PROJECT_VERSION}"
     _WIN32_WINNT=0x0A00 WINVER=0x0A00)

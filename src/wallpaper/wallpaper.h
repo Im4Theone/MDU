@@ -27,6 +27,11 @@ public:
     // Does nothing if MDU has not changed the wallpaper.
     bool restore(std::string& error);
 
+    // True while MDU's wallpaper is applied and the previous one is remembered.
+    bool hasRestoreState() const;
+    // Wallpaper file currently shown on the first monitor, as reported by Windows.
+    static std::wstring currentWallpaper();
+
 private:
     struct Prepared {
         std::filesystem::path image;

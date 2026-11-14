@@ -24,6 +24,7 @@ constexpr UINT webViewFailedMessage = WM_APP + 3;
 constexpr UINT_PTR rebuildTimer = 1;
 constexpr UINT rebuildDelayMs = 300;  // display changes arrive in bursts
 
+
 std::string timestampForFileName()
 {
     const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
@@ -68,7 +69,7 @@ int App::run()
         DispatchMessageW(&message);
     }
     shutdown();
-    return static_cast<int>(message.wParam);
+    return selfTest_ ? selfTest_->exitCode : static_cast<int>(message.wParam);
 }
 
 bool App::initialize()
@@ -109,7 +110,11 @@ bool App::initialize()
     }
 
     loadConfiguration();
-    applyStartupRegistration();
+    if (!options_.selfTestReport.empty()) {
+        selfTest_ = std::make_unique<SelfTestState>();  // never touches the startup registration
+    } else {
+        applyStartupRegistration();
+    }
 
     if (safeMode_) {
         log::warning("running in safe mode");
@@ -117,6 +122,10 @@ bool App::initialize()
                options_.safeMode ? L"The dock and wallpaper are off. Use the tray icon to restart normally."
                                  : L"MDU closed unexpectedly several times, so the dock and wallpaper are off. "
                                    L"Use the tray icon to restart normally.");
+        if (selfTest_) {
+            selfTest_->checks.push_back({"normal_mode", false, "started in safe mode"});
+            finishSelfTest(false);
+        }
         return true;
     }
 
@@ -136,6 +145,9 @@ bool App::initialize()
     // Wallpaper work can take a moment the first time, so do it after the
     // docks are on their way.
     PostMessageW(window_, applyWallpaperMessage, 0, 0);
+    if (selfTest_) {
+        startSelfTest();
+    }
     return true;
 }
 
@@ -219,6 +231,11 @@ LRESULT App::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
         if (wParam == rebuildTimer) {
             KillTimer(window_, rebuildTimer);
             rebuildDocks();
+        } else if (wParam == selfTestTimeoutTimer) {
+            finishSelfTest(true);
+        } else if (wParam == selfTestStepTimer) {
+            KillTimer(window_, selfTestStepTimer);
+            selfTestStep();
         }
         return 0;
 
@@ -477,16 +494,34 @@ void App::refreshIcons()
 
 void App::onDockMessage(DockWindow&, const bridge::IncomingMessage& message)
 {
+    if (std::holds_alternative<bridge::ReadyMessage>(message)) {
+        if (selfTestActive()) {
+            selfTestOnDockReady();
+        }
+        return;
+    }
+
     if (const auto* launch = std::get_if<bridge::LaunchMessage>(&message)) {
         const auto item = std::ranges::find_if(config_.pinned, [&](const auto& p) { return p.id == launch->itemId; });
         if (item == config_.pinned.end()) {
             log::warning("launch request for unknown item \"" + launch->itemId + "\"");
+            if (selfTest_) {
+                ++selfTest_->unknownLaunchRequests;
+            }
             return;
         }
         std::wstring error;
-        if (!launchItem(*item, error)) {
+        const bool launched = launchItem(*item, error);
+        if (!launched) {
             log::error("cannot launch \"" + item->id + "\": " + toUtf8(error));
             notify(L"Could not open " + toWide(item->name), error);
+        }
+        if (selfTest_) {
+            if (launched) {
+                selfTest_->launchedIds.push_back(item->id);
+            } else {
+                ++selfTest_->failedLaunches;
+            }
         }
     }
 }
@@ -545,9 +580,15 @@ void App::applyWallpaperSetting()
         notify(L"No wallpaper configured", L"The current theme has no wallpaper. Set wallpaper.image in the settings file.");
         return;
     }
-    if (!wallpaper_->apply(request, error)) {
+    const bool applied = wallpaper_->apply(request, error);
+    if (!applied) {
         log::error("wallpaper: " + error);
         notify(L"Wallpaper not applied", toWide(error));
+    }
+    if (selfTest_) {
+        selfTest_->wallpaperAttempted = true;
+        selfTest_->wallpaperApplied = applied;
+        selfTest_->wallpaperError = error;
     }
 }
 

@@ -20,8 +20,9 @@ struct AppPaths {
 };
 
 // Everything lives under the per-user local application data folder, so normal
-// operation never needs administrator rights.
-std::optional<AppPaths> resolveAppPaths();
+// operation never needs administrator rights. `dataOverride`, if not empty,
+// replaces that folder (used for isolated test runs).
+std::optional<AppPaths> resolveAppPaths(const std::filesystem::path& dataOverride = {});
 
 std::filesystem::path executablePath();
 

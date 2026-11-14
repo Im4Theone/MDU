@@ -31,7 +31,64 @@ jobs:
         working-directory: web
         run: npm run check
 
+      # Runs the real application on the runner's desktop: docks, WebView2,
+      # clicking an item, rejecting bad messages, wallpaper apply/restore.
+      - name: Runtime self-test
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'mdu-self-test'
+          $data = Join-Path $out 'data'
+          New-Item -ItemType Directory -Force $data | Out-Null
+
+          # A synthetic portrait wallpaper (the real artwork is not in the repository).
+          Add-Type -AssemblyName System.Drawing
+          $bitmap = New-Object System.Drawing.Bitmap 600, 750
+          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+          $graphics.Clear([System.Drawing.Color]::FromArgb(168, 168, 168))
+          $brush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(134, 168, 60))
+          $graphics.FillEllipse($brush, 150, 100, 300, 400)
+          $graphics.Dispose()
+          $wallpaper = Join-Path $data 'test-wallpaper.png'
+          $bitmap.Save($wallpaper, [System.Drawing.Imaging.ImageFormat]::Png)
+          $bitmap.Dispose()
+
+          @{ startWithWindows = $false; wallpaper = @{ enabled = $true; image = $wallpaper } } |
+            ConvertTo-Json | Set-Content -Path (Join-Path $data 'config.json') -Encoding utf8NoBOM
+
+          $report = Join-Path $out 'report.json'
+          $process = Start-Process -FilePath 'build\windows\Release\mdu.exe' -PassThru `
+            -ArgumentList @('--self-test', "`"$report`"", '--data-dir', "`"$data`"")
+          if (-not $process.WaitForExit(120000)) {
+            $process.Kill()
+            Write-Error 'mdu.exe did not exit within 120 seconds'
+          }
+          Copy-Item (Join-Path $data 'logs\mdu.log') $out -ErrorAction SilentlyContinue
+
+          if (Test-Path $report) {
+            $result = Get-Content $report -Raw | ConvertFrom-Json
+            foreach ($check in $result.checks) {
+              $mark = if ($check.passed) { 'PASS' } else { 'FAIL' }
+              Write-Output ("{0}  {1}  {2}" -f $mark, $check.name, $check.detail)
+            }
+          } else {
+            Write-Output 'No report was written.'
+            Get-Content (Join-Path $out 'mdu.log') -ErrorAction SilentlyContinue
+          }
+          exit $process.ExitCode
+
+      - name: Upload self-test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdu-self-test
+          path: |
+            ${{ runner.temp }}/mdu-self-test/*.json
+            ${{ runner.temp }}/mdu-self-test/*.png
+            ${{ runner.temp }}/mdu-self-test/mdu.log
+          if-no-files-found: warn
+
       - name: Upload build
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: mdu-windows-x64

@@ -48,6 +48,14 @@ public:
     // Sends the latest state to the page; kept and re-sent after page reloads.
     void postState(std::string json);
 
+    // Diagnostics, used by the self-test.
+    HWND window() const { return window_; }
+    bool pageReady() const { return pageReady_; }
+    int rejectedMessages() const { return rejectedMessages_; }
+    int blockedNavigations() const { return blockedNavigations_; }
+    std::wstring currentUri() const;
+    void executeScript(const std::wstring& script);
+
     static constexpr wchar_t appOrigin[] = L"https://mdu.example/";
     static constexpr wchar_t themesOrigin[] = L"https://themes.mdu.example/";
 
@@ -78,6 +86,8 @@ private:
     bool pageReady_ = false;
     bool hasBounds_ = false;
     bool fullscreenHidden_ = false;
+    int rejectedMessages_ = 0;
+    int blockedNavigations_ = 0;
 
     // Async WebView2 callbacks hold a weak reference so they never touch a destroyed window.
     std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);

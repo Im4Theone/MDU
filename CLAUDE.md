@@ -60,9 +60,12 @@ useful early signal but its SDK headers are older than the Windows 11 SDK
 (no `DWMWA_WINDOW_CORNER_PREFERENCE`, no `wrl/implements.h`), so those errors
 are expected there.
 
-Runtime behaviour (dock placement, app bar, WebView2 transparency, wallpaper,
-multi-monitor hot-plug) can only be verified on real Windows. Say so instead of
-claiming it works.
+Runtime behaviour can only be verified on real Windows. The CI job runs
+`mdu.exe --self-test` (src/app/app_self_test.cpp) on the runner and uploads the
+report and screenshots as `mdu-self-test`; read them before claiming runtime
+behaviour works. The runner has one monitor, so multi-monitor, mixed-DPI and
+hot-plug behaviour remain unverified until tested on real hardware. When adding
+a user-visible feature, add a self-test check for it if it can be observed.
 
 ## Conventions
 

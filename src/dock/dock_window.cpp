@@ -268,12 +268,14 @@ void DockWindow::configureWebView()
     }
 
     EventRegistrationToken token{};
-    const auto blockUntrustedNavigation = [](ICoreWebView2*, ICoreWebView2NavigationStartingEventArgs* args) -> HRESULT {
+    const auto blockUntrustedNavigation = [this](ICoreWebView2*,
+                                                 ICoreWebView2NavigationStartingEventArgs* args) -> HRESULT {
         CoTaskString uri;
         args->get_Uri(uri.put());
         if (!isTrustedUri(uri.get())) {
             log::warning("blocked navigation to " + toUtf8(uri.get()));
             args->put_Cancel(TRUE);
+            ++blockedNavigations_;
         }
         return S_OK;
     };
@@ -352,6 +354,7 @@ void DockWindow::onWebMessage(ICoreWebView2WebMessageReceivedEventArgs* args)
     const auto message = bridge::parseIncoming(toUtf8(text.get()));
     if (!message) {
         log::warning("ignored invalid message from the dock page");
+        ++rejectedMessages_;
         return;
     }
 
@@ -362,6 +365,23 @@ void DockWindow::onWebMessage(ICoreWebView2WebMessageReceivedEventArgs* args)
     }
     if (callbacks_.message) {
         callbacks_.message(*this, *message);
+    }
+}
+
+std::wstring DockWindow::currentUri() const
+{
+    if (!webView_) {
+        return {};
+    }
+    CoTaskString uri;
+    webView_->get_Source(uri.put());
+    return uri.get();
+}
+
+void DockWindow::executeScript(const std::wstring& script)
+{
+    if (webView_) {
+        webView_->ExecuteScript(script.c_str(), nullptr);
     }
 }
 

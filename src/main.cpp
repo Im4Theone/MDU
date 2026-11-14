@@ -7,6 +7,7 @@
 #include <shellapi.h>
 #include <windows.h>
 
+#include <filesystem>
 #include <format>
 #include <string_view>
 
@@ -19,17 +20,22 @@ mdu::LaunchOptions parseCommandLine()
     LPWSTR* arguments = CommandLineToArgvW(GetCommandLineW(), &count);
     for (int i = 1; arguments && i < count; ++i) {
         const std::wstring_view argument = arguments[i];
+        const bool hasValue = i + 1 < count;
         if (argument == L"--safe-mode") {
             options.safeMode = true;
         } else if (argument == L"--startup") {
             options.fromStartup = true;
+        } else if (argument == L"--data-dir" && hasValue) {
+            options.dataDirectory = arguments[++i];
+        } else if (argument == L"--self-test" && hasValue) {
+            options.selfTestReport = std::filesystem::absolute(arguments[++i]);
         }
     }
     LocalFree(arguments);
 
     // Holding Shift while MDU starts is an escape hatch that needs no files or
-    // menus: it always starts in safe mode.
-    if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
+    // menus: it always starts in safe mode. (Not for automated self-tests.)
+    if (options.selfTestReport.empty() && (GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
         options.safeMode = true;
     }
     return options;
@@ -84,7 +90,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
 
     const auto options = parseCommandLine();
 
-    mdu::SingleInstance instanceGuard(L"Local\\MDU.Instance.3f2b8c1e-5d47-4a8e-9b61-0c7e2f9a4d18");
+    // A self-test runs isolated (own data folder) and may run next to a normal instance.
+    mdu::SingleInstance instanceGuard(options.selfTestReport.empty()
+                                          ? L"Local\\MDU.Instance.3f2b8c1e-5d47-4a8e-9b61-0c7e2f9a4d18"
+                                          : L"Local\\MDU.SelfTest.3f2b8c1e-5d47-4a8e-9b61-0c7e2f9a4d18");
     if (!instanceGuard.isFirstInstance()) {
         if (const HWND existing = FindWindowW(mdu::App::messageWindowClass, nullptr)) {
             PostMessageW(existing, mdu::App::secondInstanceMessage, 0, 0);
@@ -97,9 +106,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
         return 1;
     }
 
-    const auto paths = mdu::resolveAppPaths();
+    const auto paths = mdu::resolveAppPaths(options.dataDirectory);
     if (!paths) {
-        MessageBoxW(nullptr, L"MDU cannot access its data folder in %LOCALAPPDATA%.", L"MDU", MB_ICONERROR);
+        if (options.selfTestReport.empty()) {
+            MessageBoxW(nullptr, L"MDU cannot access its data folder in %LOCALAPPDATA%.", L"MDU", MB_ICONERROR);
+        }
         return 1;
     }
 

@@ -24,16 +24,29 @@ std::filesystem::path executablePath()
     }
 }
 
-std::optional<AppPaths> resolveAppPaths()
+namespace {
+
+std::filesystem::path localAppDataFolder()
 {
     PWSTR localAppData = nullptr;
     const HRESULT hr = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_DEFAULT, nullptr, &localAppData);
-    if (FAILED(hr)) {
-        CoTaskMemFree(localAppData);
+    std::filesystem::path result;
+    if (SUCCEEDED(hr)) {
+        result = std::filesystem::path(localAppData) / L"MDU";
+    }
+    CoTaskMemFree(localAppData);
+    return result;
+}
+
+}  // namespace
+
+std::optional<AppPaths> resolveAppPaths(const std::filesystem::path& dataOverride)
+{
+    const std::filesystem::path base =
+        dataOverride.empty() ? localAppDataFolder() : std::filesystem::absolute(dataOverride);
+    if (base.empty()) {
         return std::nullopt;
     }
-    const std::filesystem::path base = std::filesystem::path(localAppData) / L"MDU";
-    CoTaskMemFree(localAppData);
 
     const auto exe = executablePath();
     if (exe.empty()) {
