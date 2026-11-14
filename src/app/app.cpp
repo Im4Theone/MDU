@@ -20,7 +20,6 @@ namespace {
 
 constexpr UINT trayMessage = WM_APP + 1;
 constexpr UINT applyWallpaperMessage = WM_APP + 2;
-constexpr UINT webViewFailedMessage = WM_APP + 3;
 constexpr UINT_PTR rebuildTimer = 1;
 constexpr UINT rebuildDelayMs = 300;  // display changes arrive in bursts
 
@@ -154,6 +153,7 @@ bool App::initialize()
 void App::shutdown()
 {
     KillTimer(window_, rebuildTimer);
+    settings_.reset();
     docks_.clear();  // removes app bar reservations
     webViewEnvironment_.reset();
     tray_.reset();
@@ -197,9 +197,15 @@ LRESULT App::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
     switch (message) {
     case trayMessage:
         switch (LOWORD(lParam)) {
-        case WM_CONTEXTMENU:
         case NIN_SELECT:
         case NIN_KEYSELECT:
+            // Click: settings. Right-click: menu. In safe mode only the menu exists.
+            if (!safeMode_) {
+                openSettings();
+                break;
+            }
+            [[fallthrough]];
+        case WM_CONTEXTMENU:
             showTrayMenu(POINT{static_cast<short>(LOWORD(wParam)), static_cast<short>(HIWORD(wParam))});
             break;
         default:
@@ -208,7 +214,16 @@ LRESULT App::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
         return 0;
 
     case secondInstanceMessage:
-        notify(L"MDU is already running", L"Use the MDU icon in the notification area to change settings or exit.");
+        // Starting MDU again (Start menu, desktop shortcut) opens its settings.
+        if (safeMode_) {
+            notify(L"MDU is in safe mode", L"Use the MDU icon in the notification area to restart it normally.");
+        } else {
+            openSettings();
+        }
+        return 0;
+
+    case settingsClosedMessage:
+        settings_.reset();
         return 0;
 
     case applyWallpaperMessage:
@@ -261,6 +276,7 @@ LRESULT App::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
 
     case exitRequestMessage:
         log::info("exit requested");
+        settings_.reset();
         docks_.clear();
         DestroyWindow(window_);
         return 0;
@@ -351,6 +367,7 @@ void App::reloadEverything()
     refreshIcons();
     rebuildDocks();
     applyWallpaperSetting();
+    sendSettingsState();
 }
 
 // --- Docks ------------------------------------------------------------------
@@ -551,6 +568,7 @@ void App::onWebViewProcessFailed()
     std::erase_if(browserFailures_, [&](auto time) { return now - time > std::chrono::minutes(5); });
     browserFailures_.push_back(now);
 
+    settings_.reset();
     docks_.clear();
     webViewEnvironment_.reset();
     if (browserFailures_.size() >= 3) {
@@ -614,6 +632,7 @@ void App::applyWallpaperSetting()
 namespace {
 
 enum TrayCommand : UINT {
+    commandSettings = 99,
     commandToggleDock = 100,
     commandToggleWallpaper,
     commandToggleStartup,
@@ -638,12 +657,17 @@ void App::showTrayMenu(POINT anchor)
         AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, L"Safe mode: dock and wallpaper are off");
         AppendMenuW(menu, MF_STRING, commandRestartNormally, L"Restart in normal mode");
     } else {
+        AppendMenuW(menu, MF_STRING, commandSettings, L"Settings");
+        SetMenuDefaultItem(menu, commandSettings, FALSE);
+        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
         AppendMenuW(menu, checked(config_.dock.enabled), commandToggleDock, L"Show dock");
         AppendMenuW(menu, checked(config_.wallpaper.enabled), commandToggleWallpaper, L"Use theme wallpaper");
     }
     AppendMenuW(menu, checked(config_.startWithWindows), commandToggleStartup, L"Start with Windows");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, commandEditSettings, L"Edit settings file");
+    if (safeMode_) {
+        AppendMenuW(menu, MF_STRING, commandEditSettings, L"Edit settings file");
+    }
     AppendMenuW(menu, MF_STRING, commandReload, L"Reload settings");
     AppendMenuW(menu, MF_STRING, commandOpenDataFolder, L"Open data folder");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
@@ -665,33 +689,34 @@ void App::showTrayMenu(POINT anchor)
 void App::handleTrayCommand(UINT command)
 {
     switch (command) {
-    case commandToggleDock:
-        config_.dock.enabled = !config_.dock.enabled;
-        saveConfiguration();
-        rebuildDocks();
+    case commandSettings:
+        openSettings();
         break;
 
-    case commandToggleWallpaper:
-        config_.wallpaper.enabled = !config_.wallpaper.enabled;
-        saveConfiguration();
-        applyWallpaperSetting();
-        break;
-
-    case commandToggleStartup:
-        config_.startWithWindows = !config_.startWithWindows;
-        saveConfiguration();
-        applyStartupRegistration();
-        break;
-
-    case commandEditSettings: {
-        const auto file = paths_.configFile.wstring();
-        const auto result = reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", file.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
-        if (result <= 32) {
-            const auto quoted = L"\"" + file + L"\"";
-            ShellExecuteW(nullptr, L"open", L"notepad.exe", quoted.c_str(), nullptr, SW_SHOWNORMAL);
-        }
+    case commandToggleDock: {
+        Config next = config_;
+        next.dock.enabled = !next.dock.enabled;
+        applyConfig(std::move(next));
         break;
     }
+
+    case commandToggleWallpaper: {
+        Config next = config_;
+        next.wallpaper.enabled = !next.wallpaper.enabled;
+        applyConfig(std::move(next));
+        break;
+    }
+
+    case commandToggleStartup: {
+        Config next = config_;
+        next.startWithWindows = !next.startWithWindows;
+        applyConfig(std::move(next));
+        break;
+    }
+
+    case commandEditSettings:
+        openSettingsFile();
+        break;
 
     case commandReload:
         reloadEverything();
@@ -708,6 +733,7 @@ void App::handleTrayCommand(UINT command)
         break;
 
     case commandExit:
+        settings_.reset();
         docks_.clear();
         DestroyWindow(window_);
         break;

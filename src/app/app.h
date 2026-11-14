@@ -4,6 +4,8 @@
 #include "dock/dock_window.h"
 #include "settings/config.h"
 #include "settings/paths.h"
+#include "ui/settings_protocol.h"
+#include "ui/settings_window.h"
 #include "ui/theme.h"
 #include "ui/webview_environment.h"
 #include "wallpaper/wallpaper.h"
@@ -72,6 +74,16 @@ private:
     // Wallpaper.
     void applyWallpaperSetting();
 
+    // Settings window (app_settings.cpp).
+    void openSettings();
+    void onSettingsMessage(const std::string& text);
+    void sendSettingsState(const std::string& notice = {});
+    std::vector<settings_protocol::ThemeOption> availableThemes() const;
+    void openSettingsFile();
+    // Saves and applies a complete new configuration, doing only the work
+    // that the changed values require.
+    void applyConfig(Config next);
+
     // Self-test (app_self_test.cpp). Runs the real application, exercises it
     // through its public surfaces and writes a JSON report.
     struct SelfTestCheck {
@@ -80,7 +92,16 @@ private:
         std::string detail;
     };
     struct SelfTestState {
-        enum class Stage { WaitingForDocks, Settling, Probing, Done };
+        enum class Stage {
+            WaitingForDocks,
+            Settling,
+            Probing,
+            SettingsOpening,
+            SettingsChanged,
+            SettingsReverted,
+            SettingsClosing,
+            Done,
+        };
         Stage stage = Stage::WaitingForDocks;
         std::vector<SelfTestCheck> checks;
         std::string probeItemId;
@@ -90,6 +111,7 @@ private:
         bool wallpaperAttempted = false;
         bool wallpaperApplied = false;
         std::string wallpaperError;
+        std::string wallpaperImageBeforeSettings;
         int exitCode = 1;
     };
     void startSelfTest();
@@ -98,8 +120,13 @@ private:
     void selfTestCheckDocks();
     void selfTestProbe();
     void selfTestCheckWallpaper();
+    void selfTestOnSettingsReady();
+    void selfTestCheckSettingsChange(DockEdge expected, const std::string& label);
     void finishSelfTest(bool timedOut);
-    void selfTestScreenshot(const std::string& name);
+    void selfTestScreenshot(const std::string& name, bool dockPixelChecks = true);
+    // Private window messages shared by app.cpp, app_settings.cpp and app_self_test.cpp.
+    static constexpr UINT webViewFailedMessage = WM_APP + 3;
+    static constexpr UINT settingsClosedMessage = WM_APP + 4;
     static constexpr UINT_PTR selfTestTimeoutTimer = 2;
     static constexpr UINT_PTR selfTestStepTimer = 3;
     bool selfTestActive() const { return selfTest_ && selfTest_->stage != SelfTestState::Stage::Done; }
@@ -132,6 +159,8 @@ private:
     std::map<std::string, std::string> iconCache_;  // item id -> data URL
     std::vector<std::chrono::steady_clock::time_point> browserFailures_;
     std::unique_ptr<SelfTestState> selfTest_;
+    std::unique_ptr<SettingsWindow> settings_;
+    int rejectedSettingsMessages_ = 0;
 };
 
 }  // namespace mdu

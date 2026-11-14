@@ -4,6 +4,7 @@ add_executable(mdu WIN32
     src/main.cpp
     src/app/app.cpp
     src/app/app_self_test.cpp
+    src/app/app_settings.cpp
     src/app/commands.cpp
     src/app/single_instance.cpp
     src/dock/app_bar.cpp
@@ -11,9 +12,11 @@ add_executable(mdu WIN32
     src/settings/paths.cpp
     src/ui/webview_environment.cpp
     src/ui/webview_host.cpp
+    src/ui/settings_window.cpp
     src/utilities/strings.cpp
     src/wallpaper/wallpaper.cpp
     src/windows/app_launcher.cpp
+    src/windows/file_picker.cpp
     src/windows/icon_extractor.cpp
     src/windows/image_io.cpp
     src/windows/monitors.cpp
@@ -44,6 +47,7 @@ find_program(NPM_EXECUTABLE NAMES npm.cmd npm REQUIRED)
 set(MDU_WEB_SOURCES
     ${PROJECT_SOURCE_DIR}/web/scripts/bridge.ts
     ${PROJECT_SOURCE_DIR}/web/scripts/dock.ts
+    ${PROJECT_SOURCE_DIR}/web/scripts/settings.ts
     ${PROJECT_SOURCE_DIR}/web/tsconfig.json
     ${PROJECT_SOURCE_DIR}/web/package.json)
 set(MDU_WEB_STAMP ${CMAKE_CURRENT_BINARY_DIR}/web.stamp)
@@ -65,7 +69,7 @@ add_custom_command(TARGET mdu POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
         ${PROJECT_SOURCE_DIR}/web/dist/scripts $<TARGET_FILE_DIR:mdu>/web/scripts
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${PROJECT_SOURCE_DIR}/web/index.html $<TARGET_FILE_DIR:mdu>/web/index.html
+        ${PROJECT_SOURCE_DIR}/web/index.html ${PROJECT_SOURCE_DIR}/web/settings.html $<TARGET_FILE_DIR:mdu>/web
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
         ${PROJECT_SOURCE_DIR}/themes $<TARGET_FILE_DIR:mdu>/themes
     VERBATIM)
@@ -73,7 +77,7 @@ add_custom_command(TARGET mdu POST_BUILD
 install(TARGETS mdu RUNTIME DESTINATION .)
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/web/styles DESTINATION web)
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/web/dist/scripts DESTINATION web)
-install(FILES ${PROJECT_SOURCE_DIR}/web/index.html DESTINATION web)
+install(FILES ${PROJECT_SOURCE_DIR}/web/index.html ${PROJECT_SOURCE_DIR}/web/settings.html DESTINATION web)
 # User-supplied wallpaper images are never packaged.
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/themes DESTINATION . REGEX "/wallpaper/.*\\.(jpe?g|png)$" EXCLUDE)
 install(FILES ${PROJECT_SOURCE_DIR}/LICENSE DESTINATION .)

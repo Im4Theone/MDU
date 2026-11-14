@@ -36,6 +36,7 @@ add_library(mdu_core STATIC
     src/dock/dock_layout.cpp
     src/settings/config.cpp
     src/ui/bridge.cpp
+    src/ui/settings_protocol.cpp
     src/ui/theme.cpp
     src/utilities/base64.cpp
     src/utilities/file_io.cpp

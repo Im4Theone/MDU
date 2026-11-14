@@ -27,7 +27,7 @@ namespace mdu {
 
 namespace {
 
-constexpr UINT timeoutMs = 60'000;
+constexpr UINT timeoutMs = 90'000;
 constexpr UINT settleMs = 1'500;  // let the page render and the fade-in finish
 constexpr UINT probeMs = 3'000;   // time for clicks, messages and the navigation attempt
 
@@ -144,12 +144,55 @@ void App::selfTestStep()
                           dock.blockedNavigations() >= 1 && uri.starts_with(WebViewHost::appOrigin),
                           std::format("{} blocked; page is {}", dock.blockedNavigations(), toUtf8(uri))});
 
-        selfTestCheckWallpaper();
-        finishSelfTest(false);
+        // Next: the settings window. Continues in selfTestOnSettingsReady().
+        selfTest_->stage = SelfTestState::Stage::SettingsOpening;
+        selfTest_->wallpaperImageBeforeSettings = config_.wallpaper.image;
+        openSettings();
+        checks.push_back({"settings_window_opened", settings_ != nullptr, settings_ ? "created" : "failed"});
+        if (!settings_) {
+            selfTestCheckWallpaper();
+            finishSelfTest(false);
+        }
         break;
     }
 
+    case SelfTestState::Stage::SettingsChanged: {
+        auto& checks = selfTest_->checks;
+        selfTestCheckSettingsChange(DockEdge::Left, "settings_change_applied");
+        checks.push_back({"settings_messages_rejected",
+                          rejectedSettingsMessages_ >= 4 && selfTest_->launchedIds.size() == 1 &&
+                              config_.wallpaper.image == selfTest_->wallpaperImageBeforeSettings,
+                          std::format("{} rejected; launches still {}; wallpaper image {}", rejectedSettingsMessages_,
+                                      selfTest_->launchedIds.size(),
+                                      config_.wallpaper.image == selfTest_->wallpaperImageBeforeSettings
+                                          ? "unchanged"
+                                          : "CHANGED")});
+        selfTestScreenshot("settings", false);
+
+        settings_->executeScript(LR"(document.querySelector('input[name="edge"][value="bottom"]').click();)");
+        selfTest_->stage = SelfTestState::Stage::SettingsReverted;
+        SetTimer(window_, selfTestStepTimer, probeMs, nullptr);
+        break;
+    }
+
+    case SelfTestState::Stage::SettingsReverted:
+        selfTestCheckSettingsChange(DockEdge::Bottom, "settings_change_reverted");
+        if (settings_) {
+            SendMessageW(settings_->window(), WM_CLOSE, 0, 0);
+        }
+        selfTest_->stage = SelfTestState::Stage::SettingsClosing;
+        SetTimer(window_, selfTestStepTimer, 500, nullptr);
+        break;
+
+    case SelfTestState::Stage::SettingsClosing:
+        selfTest_->checks.push_back({"settings_window_closed", settings_ == nullptr,
+                                     settings_ ? "still open" : "destroyed on close"});
+        selfTestCheckWallpaper();
+        finishSelfTest(false);
+        break;
+
     case SelfTestState::Stage::WaitingForDocks:
+    case SelfTestState::Stage::SettingsOpening:
     case SelfTestState::Stage::Done:
         break;
     }
@@ -195,7 +238,49 @@ void App::selfTestCheckDocks()
     }
 }
 
-void App::selfTestScreenshot(const std::string& name)
+void App::selfTestOnSettingsReady()
+{
+    if (selfTest_->stage != SelfTestState::Stage::SettingsOpening || !settings_) {
+        return;
+    }
+    log::info("self-test: settings page ready");
+    selfTest_->checks.push_back({"settings_page_ready", true, "page loaded and announced itself"});
+
+    // Malicious or misdirected messages first, then a real click on a control.
+    settings_->executeScript(LR"((() => {
+  const post = (m) => window.chrome.webview.postMessage(JSON.stringify(m));
+  post({ type: 'settings-update', settings: { wallpaper: { image: 'C:\Windows\evil.jpg' } } });
+  post({ type: 'settings-items', order: ['not-an-item'] });
+  post({ type: 'settings-rename', id: 'explorer', name: 'bad
+name' });
+  post({ type: 'launch', id: 'notepad' });
+  setTimeout(() => document.querySelector('input[name="edge"][value="left"]').click(), 300);
+})();)");
+    selfTest_->stage = SelfTestState::Stage::SettingsChanged;
+    SetTimer(window_, selfTestStepTimer, probeMs, nullptr);
+}
+
+void App::selfTestCheckSettingsChange(DockEdge expected, const std::string& label)
+{
+    const auto onDisk = loadConfigFile(paths_.configFile).config.dock.edge;
+    bool placed = !docks_.empty();
+    std::string geometry;
+    for (const auto& dock : docks_) {
+        const Rect rect = windowRect(dock->window());
+        const Rect& bounds = dock->monitor().bounds;
+        const bool ok = expected == DockEdge::Left ? rect.height() > rect.width() && rect.left - bounds.left < 48
+                                                   : rect.width() > rect.height() && bounds.bottom - rect.bottom < 160;
+        placed = placed && ok;
+        geometry += rectText(rect) + " ";
+    }
+    const bool passed = config_.dock.edge == expected && onDisk == expected && placed;
+    selfTest_->checks.push_back(
+        {label, passed,
+         std::format("in memory {}, on disk {}, dock {}", config_.dock.edge == expected ? "ok" : "WRONG",
+                     onDisk == expected ? "ok" : "WRONG", geometry)});
+}
+
+void App::selfTestScreenshot(const std::string& name, bool dockPixelChecks)
 {
     const auto directory = options_.selfTestReport.parent_path();
     const Rect screen = virtualScreenBounds();
@@ -203,7 +288,7 @@ void App::selfTestScreenshot(const std::string& name)
     std::string error;
     const bool saved = capture && savePng(imagingFactory_.Get(), *capture, directory / (name + ".png"), error);
     selfTest_->checks.push_back({"screenshot", saved, saved ? name + ".png " + rectText(screen) : error});
-    if (!capture) {
+    if (!capture || !dockPixelChecks) {
         return;
     }
 
@@ -344,6 +429,7 @@ void App::finishSelfTest(bool timedOut)
 
     selfTest_->exitCode = timedOut ? 2 : (passed ? 0 : 3);
     log::info(std::format("self-test: finished, exit code {}", selfTest_->exitCode));
+    settings_.reset();
     docks_.clear();
     if (window_) {
         DestroyWindow(window_);

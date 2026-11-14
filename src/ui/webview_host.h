@@ -34,7 +34,9 @@ public:
     struct Options {
         std::wstring page;        // relative to web/, e.g. L"index.html"
         std::string name;         // for log messages
-        bool transparent = false;  // transparent background (the dock) or opaque (normal windows)
+        // Shown before the page paints: fully transparent for the dock, the
+        // page colour for normal windows (avoids a white flash).
+        COREWEBVIEW2_COLOR background{255, 255, 255, 255};
         bool startVisible = true;
     };
 

@@ -14,9 +14,12 @@ layer. C++23 + Win32 + WebView2 natively, TypeScript/HTML/CSS for the UI.
 - No telemetry and no network requests. WebView2 may only show
   `https://mdu.example/` (mapped to `web/`) and load theme files from
   `https://themes.mdu.example/` (mapped to `themes/`).
-- The frontend is untrusted. It sends only messages listed in
-  `src/ui/bridge.cpp`; anything it references (such as an item to launch) is
-  looked up in native configuration. Never accept paths or commands from it.
+- The frontend is untrusted. The dock page sends only messages listed in
+  `src/ui/bridge.cpp`, the settings page only those in
+  `src/ui/settings_protocol.cpp`; anything they reference (such as an item to
+  launch) is looked up in native configuration. Never accept paths or commands
+  from a page: files are chosen through native dialogs. All WebView2 windows
+  go through `ui/webview_host` for the same lockdown.
 - Nothing theme-specific in core code. Visual choices belong in
   `themes/<id>/theme.json` and `theme.css`.
 - Never commit third-party artwork. The Miku wallpaper is user-supplied and
@@ -30,7 +33,8 @@ layer. C++23 + Win32 + WebView2 natively, TypeScript/HTML/CSS for the UI.
 - `src/` is split into a **portable core** (no Windows headers; built as
   `mdu_core` on every OS and unit-tested) and **Windows code** (built only into
   `mdu.exe`). Portable: `app/crash_guard`, `dock/dock_layout`, `settings/config`,
-  `ui/bridge`, `ui/theme`, `wallpaper/adapt`, `utilities/{file_io,log,base64}`.
+  `ui/bridge`, `ui/settings_protocol`, `ui/theme`, `wallpaper/adapt`,
+  `utilities/{file_io,log,base64}`.
   Keep logic that can be tested in the portable part.
 - `cmake/App.cmake` defines the Windows target and copies `web/` and `themes/`
   next to the executable (the same layout the installer will use).

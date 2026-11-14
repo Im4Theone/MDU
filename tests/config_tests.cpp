@@ -102,3 +102,13 @@ TEST_CASE("config: missing file yields defaults without warnings")
     CHECK(result.warnings.empty());
     CHECK(!result.fileWasInvalid);
 }
+
+TEST_CASE("config: unique item ids from display names")
+{
+    std::vector<PinnedItem> items{{"visual-studio-code", "VS Code", "code.exe", ""}};
+    CHECK_EQ(makeUniqueItemId("Visual Studio Code", items), std::string("visual-studio-code-2"));
+    CHECK_EQ(makeUniqueItemId("Notepad++", items), std::string("notepad"));
+    CHECK_EQ(makeUniqueItemId("  ", items), std::string("item"));
+    CHECK_EQ(makeUniqueItemId("\xE3\x83\x9F\xE3\x82\xAF", items), std::string("item"));  // non-ASCII name
+    CHECK(isValidItemId(makeUniqueItemId(std::string(200, 'a'), items)));
+}

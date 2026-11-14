@@ -35,8 +35,17 @@ function host(): WebViewHost | undefined {
 }
 
 export function send(message: OutgoingMessage): void {
-  // The native side expects a JSON string and validates it independently.
+  post(message);
+}
+
+/** Sends any message; the native side expects a JSON string and validates it independently. */
+export function post(message: object): void {
   host()?.postMessage(JSON.stringify(message));
+}
+
+/** Receives every message from the native side, unvalidated. */
+export function onMessage(listener: (data: unknown) => void): void {
+  host()?.addEventListener("message", (event) => listener(event.data));
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

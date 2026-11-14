@@ -5,6 +5,7 @@ add_executable(mdu_tests
     config_tests.cpp
     crash_guard_tests.cpp
     dock_layout_tests.cpp
+    settings_protocol_tests.cpp
     theme_tests.cpp
     wallpaper_tests.cpp
 )

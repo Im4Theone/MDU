@@ -15,6 +15,9 @@ First development version.
 - Theme system (`theme.json` + optional stylesheet) and the Miku theme.
 - Phone-to-desktop wallpaper adaptation with restore of the previous wallpaper.
 - Reduced-motion support.
+- Settings window (tray click, or starting MDU again): live changes, native
+  file dialogs for pinned apps and wallpaper images, strict validation of
+  every message from the page. Covered by the runtime self-test.
 - Per-user installer (Inno Setup): no administrator rights, Start menu entry,
   optional startup and desktop shortcut, clean uninstall that restores the
   wallpaper and offers to keep settings. Installer commands `--exit`,

@@ -5,6 +5,7 @@
     "accent-strong": "#a3c650",
     "accent-muted": "#5b7330",
     "surface": "rgba(12, 12, 18, 0.80)",
+    "page-background": "#0e0f13",
     "surface-hover": "rgba(134, 168, 60, 0.16)",
     "surface-border": "rgba(134, 168, 60, 0.30)",
     "text": "#e4e8dc",

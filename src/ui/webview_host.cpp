@@ -94,11 +94,9 @@ void WebViewHost::onControllerCreated(ICoreWebView2Controller* controller)
         return;
     }
 
-    if (options_.transparent) {
-        ComPtr<ICoreWebView2Controller2> controller2;
-        if (SUCCEEDED(controller_.As(&controller2))) {
-            controller2->put_DefaultBackgroundColor(COREWEBVIEW2_COLOR{0, 0, 0, 0});
-        }
+    ComPtr<ICoreWebView2Controller2> controller2;
+    if (SUCCEEDED(controller_.As(&controller2))) {
+        controller2->put_DefaultBackgroundColor(options_.background);
     }
 
     configure();

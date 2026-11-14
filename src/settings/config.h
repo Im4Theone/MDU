@@ -20,6 +20,8 @@ struct PinnedItem {
     std::string name;       // display name
     std::string target;     // file, folder, shortcut or URI; environment variables are expanded
     std::string arguments;  // optional command-line arguments
+
+    bool operator==(const PinnedItem&) const = default;
 };
 
 struct DockSettings {
@@ -29,6 +31,8 @@ struct DockSettings {
     DockPlacement placement = DockPlacement::Reserve;
     int iconSize = 48;  // DIPs
     int margin = 4;     // DIPs between the dock and the screen edge
+
+    bool operator==(const DockSettings&) const = default;
 };
 
 struct WallpaperSettings {
@@ -36,6 +40,8 @@ struct WallpaperSettings {
     // Absolute path, or a path relative to the active theme directory.
     // Empty means "use the theme's wallpaper".
     std::string image;
+
+    bool operator==(const WallpaperSettings&) const = default;
 };
 
 struct Config {
@@ -68,5 +74,9 @@ ConfigLoadResult loadConfigFile(const std::filesystem::path& path);
 bool saveConfigFile(const std::filesystem::path& path, const Config& config, std::string& error);
 
 bool isValidItemId(std::string_view id);
+
+// Derives a valid, unused item id from a display name ("Visual Studio Code"
+// -> "visual-studio-code", then "visual-studio-code-2" if taken).
+std::string makeUniqueItemId(std::string_view name, const std::vector<PinnedItem>& existing);
 
 }  // namespace mdu

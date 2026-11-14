@@ -134,7 +134,7 @@ jobs:
 
           $install = Start-Process $setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/TASKS=startup' -PassThru -Wait
           Check ($install.ExitCode -eq 0) "installer exit code $($install.ExitCode)"
-          foreach ($file in 'mdu.exe', 'unins000.exe', 'LICENSE', 'web\index.html', 'web\scripts\dock.js', 'web\styles\dock.css', 'themes\miku\theme.json') {
+          foreach ($file in 'mdu.exe', 'unins000.exe', 'LICENSE', 'web\index.html', 'web\settings.html', 'web\scripts\dock.js', 'web\scripts\settings.js', 'web\styles\dock.css', 'themes\miku\theme.json') {
             Check (Test-Path (Join-Path $app $file)) "installed $file"
           }
           Check (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\MDU.lnk") 'Start menu shortcut'

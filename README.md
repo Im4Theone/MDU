@@ -8,9 +8,9 @@ replaces the shell; the normal taskbar stays available at all times.
 The first theme, **Miku**, follows a Miku / Monster Energy phone theme: dark
 surfaces, muted olive accents and a grey backdrop.
 
-> Status: early development (0.1.0). The dock, tray menu, startup registration,
-> crash recovery, wallpaper adaptation and the installer are implemented. A
-> settings window is not built yet; settings are edited in a JSON file.
+> Status: early development (0.1.0). The dock, settings window, tray menu,
+> startup registration, crash recovery, wallpaper adaptation and the installer
+> are implemented.
 
 ## Installing
 
@@ -47,14 +47,21 @@ too; a silent uninstall (`/VERYSILENT`) keeps them.
 
 ## Using MDU
 
-MDU lives in the notification area. Right-click (or click) its icon for:
-show/hide the dock, use the theme wallpaper, start with Windows, edit or reload
-settings, open the data folder, and exit.
+MDU lives in the notification area. Click its icon (or start MDU again from
+the Start menu) to open **Settings**; right-click it for quick toggles, reload,
+the data folder and exit.
 
 ### Settings
 
-`%LOCALAPPDATA%\MDU\config.json` is created on first start. Edit it, then
-choose **Reload settings** from the tray menu. Comments are allowed.
+The settings window changes everything live, with no Save button: theme,
+animations, start with Windows, dock position, monitors, reserved space, icon
+size and distance from the edge, pinned apps (add, rename, reorder, remove)
+and the wallpaper. Apps and images are chosen with the normal Windows file
+dialog.
+
+Everything is stored in `%LOCALAPPDATA%\MDU\config.json`. You can also edit
+it by hand and choose **Reload settings** from the tray menu. Comments are
+allowed.
 
 ```jsonc
 {
@@ -188,7 +195,7 @@ src/
   wallpaper/         wallpaper adaptation and IDesktopWallpaper integration
   windows/           monitors, startup registration, launching, icons, tray icon
   utilities/         logging, strings, files, small helpers
-web/                 dock frontend (HTML, CSS, TypeScript)
+web/                 dock and settings pages (HTML, CSS, TypeScript)
 themes/miku/         the Miku theme
 tests/               unit tests for the portable core
 installer/           Inno Setup script

@@ -195,6 +195,36 @@ bool isValidItemId(std::string_view id)
     });
 }
 
+std::string makeUniqueItemId(std::string_view name, const std::vector<PinnedItem>& existing)
+{
+    std::string base;
+    for (const char c : name) {
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+            base += c;
+        } else if (c >= 'A' && c <= 'Z') {
+            base += static_cast<char>(c - 'A' + 'a');
+        } else if (!base.empty() && base.back() != '-') {
+            base += '-';
+        }
+    }
+    while (!base.empty() && base.back() == '-') {
+        base.pop_back();
+    }
+    if (base.empty()) {
+        base = "item";
+    }
+    base.resize(std::min<std::size_t>(base.size(), 56));
+
+    const auto taken = [&](const std::string& id) {
+        return std::ranges::any_of(existing, [&](const PinnedItem& item) { return item.id == id; });
+    };
+    std::string candidate = base;
+    for (int suffix = 2; taken(candidate); ++suffix) {
+        candidate = base + "-" + std::to_string(suffix);
+    }
+    return candidate;
+}
+
 Config defaultConfig()
 {
     Config config;

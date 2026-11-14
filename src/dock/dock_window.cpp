@@ -66,7 +66,7 @@ std::unique_ptr<DockWindow> DockWindow::create(HINSTANCE instance, const Monitor
         window, dock->content_,
         WebViewHost::Options{.page = L"index.html",
                              .name = "dock " + toUtf8(monitor.deviceName),
-                             .transparent = true,
+                             .background = COREWEBVIEW2_COLOR{0, 0, 0, 0},
                              .startVisible = false},
         WebViewHost::Callbacks{
             .message = [self](const std::string& text) { self->onPageMessage(text); },

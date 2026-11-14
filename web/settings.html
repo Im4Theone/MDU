@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self' https://themes.mdu.example; img-src 'self' data:; font-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+  <title>MDU Settings</title>
+  <link rel="stylesheet" href="styles/settings.css">
+  <script type="module" src="scripts/settings.js"></script>
+</head>
+<body>
+  <main class="page" aria-busy="true">
+    <header class="header">
+      <h1>Settings</h1>
+      <p class="muted">MDU <span id="version"></span></p>
+    </header>
+
+    <p id="notice" class="notice" role="status" hidden></p>
+
+    <section class="card" aria-labelledby="general-heading">
+      <h2 id="general-heading">General</h2>
+
+      <div class="row">
+        <div class="label">
+          <label for="start-with-windows">Start with Windows</label>
+          <p class="description">Open MDU when you sign in.</p>
+        </div>
+        <input type="checkbox" role="switch" id="start-with-windows" data-setting="startWithWindows">
+      </div>
+
+      <div class="row">
+        <div class="label">
+          <label for="theme">Theme</label>
+          <p class="description">Colours, dock appearance and wallpaper.</p>
+        </div>
+        <select id="theme" data-setting="theme"></select>
+      </div>
+
+      <div class="row">
+        <div class="label">
+          <span id="motion-label">Animations</span>
+          <p class="description">"System" follows the Windows animation effects setting.</p>
+        </div>
+        <div class="segmented" role="radiogroup" aria-labelledby="motion-label">
+          <label><input type="radio" name="motion" value="system" data-setting="motion"><span>System</span></label>
+          <label><input type="radio" name="motion" value="reduced" data-setting="motion"><span>Reduced</span></label>
+          <label><input type="radio" name="motion" value="full" data-setting="motion"><span>Full</span></label>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="dock-heading">
+      <h2 id="dock-heading">Dock</h2>
+
+      <div class="row">
+        <div class="label">
+          <label for="dock-enabled">Show the dock</label>
+        </div>
+        <input type="checkbox" role="switch" id="dock-enabled" data-setting="dock.enabled">
+      </div>
+
+      <div class="row">
+        <div class="label"><span id="edge-label">Position</span></div>
+        <div class="segmented" role="radiogroup" aria-labelledby="edge-label">
+          <label><input type="radio" name="edge" value="bottom" data-setting="dock.edge"><span>Bottom</span></label>
+          <label><input type="radio" name="edge" value="left" data-setting="dock.edge"><span>Left</span></label>
+          <label><input type="radio" name="edge" value="right" data-setting="dock.edge"><span>Right</span></label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label"><span id="monitors-label">Monitors</span></div>
+        <div class="segmented" role="radiogroup" aria-labelledby="monitors-label">
+          <label><input type="radio" name="monitors" value="all" data-setting="dock.monitors"><span>All</span></label>
+          <label><input type="radio" name="monitors" value="primary" data-setting="dock.monitors"><span>Main only</span></label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">
+          <span id="placement-label">Space</span>
+          <p class="description">Reserve keeps maximized windows clear of the dock, like the taskbar.</p>
+        </div>
+        <div class="segmented" role="radiogroup" aria-labelledby="placement-label">
+          <label><input type="radio" name="placement" value="reserve" data-setting="dock.placement"><span>Reserve</span></label>
+          <label><input type="radio" name="placement" value="overlay" data-setting="dock.placement"><span>Float</span></label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label"><label for="icon-size">Icon size</label></div>
+        <div class="range">
+          <input type="range" id="icon-size" min="24" max="128" step="4" data-setting="dock.iconSize">
+          <output for="icon-size" id="icon-size-value"></output>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label"><label for="margin">Distance from the edge</label></div>
+        <div class="range">
+          <input type="range" id="margin" min="0" max="32" step="2" data-setting="dock.margin">
+          <output for="margin" id="margin-value"></output>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="items-heading">
+      <div class="card-heading">
+        <h2 id="items-heading">Pinned apps</h2>
+        <button type="button" class="button accent" id="add-item">Add app or file</button>
+      </div>
+      <ul id="items" class="items" aria-labelledby="items-heading"></ul>
+      <p id="items-empty" class="muted empty" hidden>Nothing pinned yet.</p>
+    </section>
+
+    <section class="card" aria-labelledby="wallpaper-heading">
+      <h2 id="wallpaper-heading">Wallpaper</h2>
+
+      <div class="row">
+        <div class="label">
+          <label for="wallpaper-enabled">Use the MDU wallpaper</label>
+          <p class="description">Your previous wallpaper comes back when you turn this off.</p>
+        </div>
+        <input type="checkbox" role="switch" id="wallpaper-enabled" data-setting="wallpaper.enabled">
+      </div>
+
+      <div class="row">
+        <div class="label">
+          <span>Image</span>
+          <p class="description" id="wallpaper-image"></p>
+        </div>
+        <div class="buttons">
+          <button type="button" class="button" id="reset-wallpaper">Use theme image</button>
+          <button type="button" class="button" id="choose-wallpaper">Choose image</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="advanced-heading">
+      <h2 id="advanced-heading">Advanced</h2>
+      <div class="row">
+        <div class="label">
+          <span>Settings file</span>
+          <p class="description">All settings as JSON. Changes there need "Reload settings" from the tray menu.</p>
+        </div>
+        <button type="button" class="button" id="open-file">Open</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
