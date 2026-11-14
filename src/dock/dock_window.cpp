@@ -323,6 +323,8 @@ void DockWindow::configureWebView()
                 const auto uri = toUtf8(currentUri());
                 if (success) {
                     log::info("dock page loaded: " + uri);
+                } else if (status == COREWEBVIEW2_WEB_ERROR_STATUS_OPERATION_CANCELED) {
+                    log::info("a navigation was cancelled; the dock page stays at " + uri);
                 } else {
                     log::error(std::format("dock page failed to load: {} (web error status {})", uri,
                                            static_cast<int>(status)));

@@ -225,12 +225,14 @@ void App::selfTestScreenshot(const std::string& name)
         const int barY = horizontal ? (rect.top + rect.bottom) / 2 : rect.top + inset + dipsToPixels(5, dpi);
         const int bar = luminanceAt(*capture, screen, barX, barY);
         const int margin = luminanceAt(*capture, screen, rect.left + 1, rect.top + 1);
-        const int outside = luminanceAt(*capture, screen, rect.left - 4, rect.top - 4);
+        // The reference pixel lies next to the dock along its edge, inside the
+        // dock's own strip of the screen, where application windows cannot
+        // cover the desktop.
+        const int outside = horizontal ? luminanceAt(*capture, screen, rect.left - 4, rect.top + 1)
+                                       : luminanceAt(*capture, screen, rect.left + 1, rect.top - 4);
 
         selfTest_->checks.push_back({"dock_drawn " + label, bar >= 0 && bar < 90,
                                      std::format("bar luminance {} (expected dark)", bar)});
-        // Transparency is judged against the pixel just outside the window,
-        // which shows the same desktop.
         selfTest_->checks.push_back({"dock_transparent " + label,
                                      margin >= 0 && outside >= 0 && std::abs(margin - outside) <= 24,
                                      std::format("margin luminance {}, desktop beside it {}", margin, outside)});
