@@ -15,3 +15,7 @@ First development version.
 - Theme system (`theme.json` + optional stylesheet) and the Miku theme.
 - Phone-to-desktop wallpaper adaptation with restore of the previous wallpaper.
 - Reduced-motion support.
+- Runtime self-test (`--self-test`, `--data-dir`), run on Windows in CI with
+  screenshots. It found and fixed two startup bugs: the message window failed
+  to create (MDU exited immediately), and docks could stay empty when WebView2
+  started quickly.
