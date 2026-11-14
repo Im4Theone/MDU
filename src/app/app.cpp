@@ -170,6 +170,9 @@ LRESULT CALLBACK App::windowProc(HWND window, UINT message, WPARAM wParam, LPARA
 {
     if (message == WM_NCCREATE) {
         auto* app = static_cast<App*>(reinterpret_cast<CREATESTRUCTW*>(lParam)->lpCreateParams);
+        // CreateWindowExW has not returned yet, so window_ is still null; the
+        // creation messages must already be handled with the real handle.
+        app->window_ = window;
         SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(app));
     }
     if (auto* app = reinterpret_cast<App*>(GetWindowLongPtrW(window, GWLP_USERDATA))) {
