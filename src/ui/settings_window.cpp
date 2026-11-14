@@ -20,7 +20,10 @@ constexpr int widthDips = 760;
 constexpr int heightDips = 680;
 constexpr int minimumWidthDips = 520;
 constexpr int minimumHeightDips = 440;
-constexpr COLORREF pageColor = RGB(16, 17, 20);  // matches the settings page background
+// Matches the settings page background, so nothing flashes before it paints.
+constexpr BYTE pageRed = 16;
+constexpr BYTE pageGreen = 17;
+constexpr BYTE pageBlue = 20;
 
 // DWMWA_USE_IMMERSIVE_DARK_MODE; spelled out because older SDK headers lack it.
 constexpr DWORD darkModeAttribute = 20;
@@ -36,7 +39,7 @@ void registerWindowClass(HINSTANCE instance, WNDPROC procedure)
     windowClass.lpfnWndProc = procedure;
     windowClass.hInstance = instance;
     windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-    windowClass.hbrBackground = CreateSolidBrush(pageColor);  // lives as long as the class
+    windowClass.hbrBackground = CreateSolidBrush(RGB(pageRed, pageGreen, pageBlue));  // lives as long as the class
     windowClass.lpszClassName = windowClassName;
     LoadIconMetric(instance, MAKEINTRESOURCEW(1), LIM_LARGE, &windowClass.hIcon);
     LoadIconMetric(instance, MAKEINTRESOURCEW(1), LIM_SMALL, &windowClass.hIconSm);
@@ -83,8 +86,7 @@ std::unique_ptr<SettingsWindow> SettingsWindow::create(HINSTANCE instance, WebVi
         window, std::move(content),
         WebViewHost::Options{.page = L"settings.html",
                              .name = "settings",
-                             .background = COREWEBVIEW2_COLOR{255, GetRValue(pageColor), GetGValue(pageColor),
-                                                              GetBValue(pageColor)},
+                             .background = COREWEBVIEW2_COLOR{255, pageRed, pageGreen, pageBlue},
                              .startVisible = true},
         WebViewHost::Callbacks{
             .message = [self](const std::string& text) { self->callbacks_.message(text); },
