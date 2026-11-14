@@ -389,6 +389,10 @@ void App::rebuildDocks()
             continue;
         }
 
+        // Add the dock before asking for the environment: whenReady() runs the
+        // callback immediately if the environment is already available, and
+        // the callback finds docks by monitor.
+        docks_.push_back(std::move(dock));
         const std::wstring deviceName = monitor.deviceName;
         webViewEnvironment_.whenReady([this, deviceName](ICoreWebView2Environment* environment) {
             if (!environment) {
@@ -406,7 +410,6 @@ void App::rebuildDocks()
                 }
             }
         });
-        docks_.push_back(std::move(dock));
     }
 
     for (auto& dock : docks_) {
